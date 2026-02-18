@@ -4,9 +4,9 @@
   "description": "Mafia game Electron client",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-renderer.mjs",
     "start": "electron .",
-    "dev": "tsc && electron .",
+    "dev": "npm run build && electron .",
     "test": "jest --coverage",
     "test:integration": "jest --coverage --testPathPattern=integration"
   },

@@ -252,7 +252,12 @@ $('btn-disconnect').addEventListener('click', async () => {
 mafia.onStateUpdate((state) => renderState(state));
 mafia.onPlayerJoined(() => showStatus('A player joined'));
 mafia.onPlayerLeft(() => showStatus('A player left'));
-mafia.onPlayerReady(() => showStatus('Ready status updated'));
+mafia.onPlayerReady((payload) => {
+  if (payload && typeof payload === 'object' && payload.state) {
+    renderState(payload.state);
+  }
+  showStatus('Ready status updated');
+});
 mafia.onVoteCast(() => showStatus('Vote cast'));
 mafia.onPlayerEliminated((p) => showStatus(`Player eliminated: ${p?.playerId || 'unknown'}`));
 mafia.onGameStarted(() => showStatus('Game started'));
