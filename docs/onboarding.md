@@ -17,6 +17,13 @@ npm run dev:server
 npm run dev:client
 ```
 
+Optional hot-reload renderer workflow (recommended for UI changes):
+
+```bash
+npm run dev:renderer --workspace=client
+npm run dev:electron --workspace=client
+```
+
 ## Typical Change Workflow
 
 1. Update server rules in `server/src/Game.ts` or endpoint logic in `server/src/server.ts`.
@@ -24,7 +31,7 @@ npm run dev:client
 3. Update Electron bridge if needed:
 - `client/src/main.ts`
 - `client/src/preload.ts`
-- `client/src/renderer/renderer.js`
+- `client/renderer/src/App.jsx`
 4. Add/update tests in corresponding workspace test folders.
 
 ## AI Agent Notes

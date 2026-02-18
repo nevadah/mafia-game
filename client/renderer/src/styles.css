@@ -1,0 +1,149 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  padding: 2rem;
+}
+
+h1 { color: #e94560; margin-bottom: 1rem; }
+
+.app { max-width: 1200px; margin: 0 auto; }
+
+.card {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stack { display: grid; gap: 0.75rem; }
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: #aaa;
+}
+
+input, select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #0f3460;
+  color: #eee;
+  margin-bottom: 0.75rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #e94560;
+  color: #fff;
+  font-weight: 600;
+}
+
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.status { font-size: 0.875rem; color: #aaa; margin-top: 0.5rem; }
+.status.error { color: #e94560; }
+
+.state-view {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8rem;
+  color: #a0e4b0;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+}
+
+.players {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.player {
+  background: #0f3460;
+  border: 1px solid #1d4c83;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.player.dead { opacity: 0.55; }
+.player-name { font-weight: 700; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid #2a5f9b;
+  color: #c9defa;
+}
+
+.badge.you { border-color: #e94560; color: #ffd6dd; }
+.badge.host { border-color: #f39c12; color: #ffe3b4; }
+.badge.ready { border-color: #27ae60; color: #bff3d6; }
+.badge.not-ready { border-color: #7f8c8d; color: #d8e1e1; }
+.badge.dead { border-color: #7f8c8d; color: #d8e1e1; }
+
+.game-code-box {
+  background: #0f3460;
+  border: 1px solid #1d4c83;
+  border-radius: 8px;
+  padding: 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.game-code-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.game-code-actions { display: flex; gap: 0.5rem; }
+.copy-btn { background: #0f7bff; }
+.copy-link-btn { background: #0aa06e; }
+
+.phase { font-size: 1.25rem; font-weight: 700; color: #e94560; text-transform: uppercase; }
+.meta { color: #aaa; margin-top: 0.5rem; }
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-label input {
+  width: auto;
+  margin: 0;
+}

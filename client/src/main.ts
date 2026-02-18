@@ -4,8 +4,46 @@ import { MafiaClient } from './MafiaClient';
 
 let mainWindow: BrowserWindow | null = null;
 let client: MafiaClient | null = null;
+let pendingDeepLink: { gameId?: string; serverUrl?: string } | null = null;
+
+function parseJoinDeepLink(raw: string): { gameId?: string; serverUrl?: string } | null {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'mafia:') {
+      return null;
+    }
+
+    const target = (url.hostname || url.pathname.replace(/^\/+/, '')).toLowerCase();
+    if (target !== 'join') {
+      return null;
+    }
+
+    const gameId = url.searchParams.get('gameId') ?? undefined;
+    const serverUrl = url.searchParams.get('serverUrl') ?? undefined;
+    if (!gameId) {
+      return null;
+    }
+    return { gameId, serverUrl };
+  } catch {
+    return null;
+  }
+}
+
+function deepLinkFromArgv(argv: string[]): string | undefined {
+  return argv.find((arg) => arg.startsWith('mafia://'));
+}
+
+function dispatchDeepLink(payload: { gameId?: string; serverUrl?: string }): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('mafia:deep_link', payload);
+  } else {
+    pendingDeepLink = payload;
+  }
+}
 
 function createWindow(): void {
+  const rendererUrl = process.env.ELECTRON_RENDERER_URL;
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -17,7 +55,17 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  if (rendererUrl) {
+    mainWindow.loadURL(rendererUrl);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  }
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (pendingDeepLink) {
+      mainWindow?.webContents.send('mafia:deep_link', pendingDeepLink);
+      pendingDeepLink = null;
+    }
+  });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -33,8 +81,47 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('server_error', (p) => mainWindow?.webContents.send('mafia:server_error', p));
 }
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const raw = deepLinkFromArgv(argv);
+    if (raw) {
+      const payload = parseJoinDeepLink(raw);
+      if (payload) {
+        dispatchDeepLink(payload);
+      }
+    }
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+    }
+  });
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  const payload = parseJoinDeepLink(url);
+  if (payload) {
+    dispatchDeepLink(payload);
+  }
+});
+
 app.whenReady().then(() => {
+  app.setAsDefaultProtocolClient('mafia');
   createWindow();
+
+  const startupLink = deepLinkFromArgv(process.argv);
+  if (startupLink) {
+    const payload = parseJoinDeepLink(startupLink);
+    if (payload) {
+      dispatchDeepLink(payload);
+    }
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

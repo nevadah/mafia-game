@@ -33,5 +33,7 @@ contextBridge.exposeInMainWorld('mafia', {
   onGameEnded: (cb: (payload: unknown) => void) =>
     ipcRenderer.on('mafia:game_ended', (_e, p) => cb(p)),
   onServerError: (cb: (payload: unknown) => void) =>
-    ipcRenderer.on('mafia:server_error', (_e, p) => cb(p))
+    ipcRenderer.on('mafia:server_error', (_e, p) => cb(p)),
+  onDeepLink: (cb: (payload: { gameId?: string; serverUrl?: string }) => void) =>
+    ipcRenderer.on('mafia:deep_link', (_e, p) => cb(p))
 });

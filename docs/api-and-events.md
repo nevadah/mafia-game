@@ -83,3 +83,9 @@ Event subscriptions:
 - `onGameStarted`
 - `onGameEnded`
 - `onServerError`
+- `onDeepLink`
+
+### Deep Link Format
+
+- `mafia://join?gameId=<id>&serverUrl=<url>`
+- Main process parses and forwards payload to renderer via `onDeepLink`.

@@ -32,6 +32,13 @@ Run client:
 npm run dev:client
 ```
 
+Renderer hot-reload workflow (optional, in two terminals):
+
+```bash
+npm run dev:renderer --workspace=client
+npm run dev:electron --workspace=client
+```
+
 Build all workspaces:
 
 ```bash

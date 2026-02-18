@@ -3,7 +3,7 @@
 ## Runtime Components
 
 - Server process (`server/src/index.ts`): Express + WebSocket service.
-- Client desktop app (`client/src/main.ts` + renderer): Electron application.
+- Client desktop app (`client/src/main.ts` + React renderer): Electron application.
 - Client SDK (`client/src/MafiaClient.ts`): common API layer used by Electron main process and tests.
 
 ## Data Ownership
@@ -31,6 +31,14 @@
 - REST: command-style actions and explicit queries (`/games`, `/ready`, `/vote`, etc).
 - WebSocket: state/event broadcasts (`phase_changed`, `player_ready`, `game_ended`, etc).
 - Electron IPC: bridge from renderer to main process; main delegates to `MafiaClient`.
+
+## Client UI Build
+
+- Renderer is a React app under `client/renderer/`, built with Vite.
+- Production build emits static assets to `client/dist/renderer`.
+- Electron main can load:
+  - built file output (`dist/renderer/index.html`) in normal mode
+  - Vite dev server URL via `ELECTRON_RENDERER_URL` in hot-reload mode
 
 ## Persistence Model
 

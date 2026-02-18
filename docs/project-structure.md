@@ -41,15 +41,19 @@ Key files:
 
 ```text
 client/
+├── renderer/
+│   ├── index.html
+│   └── src/
+│       ├── App.jsx
+│       ├── main.jsx
+│       └── styles.css
 ├── src/
 │   ├── main.ts
 │   ├── preload.ts
 │   ├── MafiaClient.ts
-│   ├── types.ts
-│   └── renderer/
-│       ├── index.html
-│       └── renderer.js
+│   └── types.ts
 ├── tests/
+├── vite.config.mjs
 ├── package.json
 ├── tsconfig.json
 └── jest.config.js
@@ -60,7 +64,8 @@ Key files:
 - `client/src/MafiaClient.ts`: SDK wrapper around server REST + WebSocket APIs.
 - `client/src/main.ts`: Electron main-process orchestration and IPC handlers.
 - `client/src/preload.ts`: safe renderer API exposed as `window.mafia`.
-- `client/src/renderer/renderer.js`: UI behavior and interaction flow.
+- `client/renderer/src/App.jsx`: React renderer UI behavior and interaction flow.
+- `client/vite.config.mjs`: renderer build configuration (Vite -> `client/dist/renderer`).
 
 ## Testing Layout
 
@@ -79,3 +84,5 @@ Workspace-specific:
 
 - `npm run build --workspace=server`
 - `npm run build --workspace=client`
+- `npm run dev:renderer --workspace=client`
+- `npm run dev:electron --workspace=client`
