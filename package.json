@@ -1,31 +1,18 @@
 {
-  "name": "mafia-server",
+  "name": "mafia-game",
   "version": "1.0.0",
-  "description": "Multiplayer Mafia game web service",
-  "main": "dist/index.js",
+  "description": "Multiplayer Mafia game — monorepo root",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "test": "jest --coverage",
-    "test:ci": "jest --coverage --coverageReporters=text --coverageThreshold='{\"global\":{\"lines\":80}}'"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "uuid": "^9.0.0",
-    "ws": "^8.14.2"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/jest": "^29.5.8",
-    "@types/node": "^20.9.0",
-    "@types/supertest": "^2.0.16",
-    "@types/uuid": "^9.0.7",
-    "@types/ws": "^8.5.9",
-    "jest": "^29.7.0",
-    "supertest": "^6.3.3",
-    "ts-jest": "^29.1.1",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.2.2"
+    "test": "npm run test --workspace=server && npm run test --workspace=client",
+    "test:server": "npm run test --workspace=server",
+    "test:client": "npm run test --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build --workspace=server && npm run build --workspace=client"
   }
 }

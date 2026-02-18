@@ -2,3 +2,5 @@ node_modules/
 dist/
 coverage/
 *.js.map
+mafia-test-server-port.txt
+mafia-test-server-pid.txt
