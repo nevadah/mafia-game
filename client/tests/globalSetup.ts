@@ -20,38 +20,46 @@ export default async function globalSetup(): Promise<void> {
     });
 
     let resolved = false;
-
-    proc.stdout!.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      const match = /running on port (\d+)/.exec(text);
-      if (match && !resolved) {
-        resolved = true;
-        const port = parseInt(match[1], 10);
-        // Write port and PID to temp files so test workers can read them
-        fs.writeFileSync(PORT_FILE, port.toString(), 'utf-8');
-        fs.writeFileSync(PID_FILE, String(proc.pid), 'utf-8');
-        resolve();
-      }
-    });
-
-    proc.stderr!.on('data', (chunk: Buffer) => {
-      if (!resolved) {
-        resolved = true;
-        proc.kill();
-        reject(new Error(`Server failed to start: ${chunk.toString()}`));
-      }
-    });
-
-    proc.on('error', (err: Error) => {
-      if (!resolved) { resolved = true; reject(err); }
-    });
-
-    setTimeout(() => {
+    const startupTimeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
         proc.kill();
         reject(new Error('Server start timed out after 10s'));
       }
     }, 10000);
+
+    function finishOk(port: number): void {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(startupTimeout);
+      // Write port and PID to temp files so test workers can read them
+      fs.writeFileSync(PORT_FILE, port.toString(), 'utf-8');
+      fs.writeFileSync(PID_FILE, String(proc.pid), 'utf-8');
+      resolve();
+    }
+
+    function finishErr(err: Error): void {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(startupTimeout);
+      proc.kill();
+      reject(err);
+    }
+
+    proc.stdout!.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      const match = /running on port (\d+)/.exec(text);
+      if (match) {
+        finishOk(parseInt(match[1], 10));
+      }
+    });
+
+    proc.stderr!.on('data', (chunk: Buffer) => {
+      finishErr(new Error(`Server failed to start: ${chunk.toString()}`));
+    });
+
+    proc.on('error', (err: Error) => {
+      finishErr(err);
+    });
   });
 }

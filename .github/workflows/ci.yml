@@ -24,8 +24,22 @@ jobs:
       - name: Build workspaces
         run: npm run build
 
-      - name: Test server
-        run: npm run test:server
+      - name: Test server (strict)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:server 2>&1 | tee /tmp/test-server.log
+          if grep -Eiq '\b(warn(ing)?|deprecated)\b' /tmp/test-server.log; then
+            echo "Disallowed warning/deprecation output detected in server tests."
+            exit 1
+          fi
 
-      - name: Test client
-        run: npm run test:client
+      - name: Test client (strict)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:client 2>&1 | tee /tmp/test-client.log
+          if grep -Eiq '\b(warn(ing)?|deprecated)\b' /tmp/test-client.log; then
+            echo "Disallowed warning/deprecation output detected in client tests."
+            exit 1
+          fi

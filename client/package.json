@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "electron .",
     "dev": "tsc && electron .",
-    "test": "jest --coverage --forceExit",
+    "test": "jest --coverage",
     "test:integration": "jest --coverage --testPathPattern=integration"
   },
   "dependencies": {
