@@ -323,11 +323,33 @@ describe('REST API', () => {
       const { gameId, playerIds, hostId } = await setupVotingGame();
       await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[0], targetId: playerIds[1] });
       await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[2], targetId: playerIds[1] });
+      await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[1], targetId: playerIds[2] });
+      await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[3], targetId: playerIds[2] });
       const res = await request(app)
         .post(`/games/${gameId}/resolve-votes`)
         .send({ playerId: hostId });
       expect(res.status).toBe(200);
       expect(res.body.eliminated).toBeDefined();
+    });
+
+    it('returns 409 when votes are missing', async () => {
+      const { gameId, playerIds, hostId } = await setupVotingGame();
+      await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[0], targetId: playerIds[1] });
+      const res = await request(app)
+        .post(`/games/${gameId}/resolve-votes`)
+        .send({ playerId: hostId });
+      expect(res.status).toBe(409);
+      expect(Array.isArray(res.body.missingPlayerIds)).toBe(true);
+      expect(res.body.missingPlayerIds.length).toBeGreaterThan(0);
+    });
+
+    it('allows force resolve with missing votes', async () => {
+      const { gameId, playerIds, hostId } = await setupVotingGame();
+      await request(app).post(`/games/${gameId}/vote`).send({ voterId: playerIds[0], targetId: playerIds[1] });
+      const res = await request(app)
+        .post(`/games/${gameId}/resolve-votes`)
+        .send({ playerId: hostId, force: true });
+      expect(res.status).toBe(200);
     });
 
     it('returns 403 for non-host', async () => {
@@ -355,7 +377,7 @@ describe('REST API', () => {
       }
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
       // Advance to night
-      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId });
+      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId, force: true });
       return { gameId, playerIds, hostId };
     }
 
@@ -390,15 +412,38 @@ describe('REST API', () => {
         await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
       }
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
-      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId });
+      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId, force: true });
       return { gameId, hostId };
     }
 
     it('resolves night actions as host', async () => {
       const { gameId, hostId } = await setupNightGame();
+      const game = gameManager.getGame(gameId)!;
+      for (const actor of game.getPlayers().filter(p => p.isAlive && ['mafia', 'doctor', 'sheriff'].includes(p.role!))) {
+        const target = game.getAlivePlayers().find(p => p.id !== actor.id)!;
+        await request(app).post(`/games/${gameId}/night-action`).send({ playerId: actor.id, targetId: target.id });
+      }
       const res = await request(app)
         .post(`/games/${gameId}/resolve-night`)
         .send({ playerId: hostId });
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 409 when required night actions are missing', async () => {
+      const { gameId, hostId } = await setupNightGame();
+      const res = await request(app)
+        .post(`/games/${gameId}/resolve-night`)
+        .send({ playerId: hostId });
+      expect(res.status).toBe(409);
+      expect(Array.isArray(res.body.missingPlayerIds)).toBe(true);
+      expect(res.body.missingPlayerIds.length).toBeGreaterThan(0);
+    });
+
+    it('allows force resolve with missing night actions', async () => {
+      const { gameId, hostId } = await setupNightGame();
+      const res = await request(app)
+        .post(`/games/${gameId}/resolve-night`)
+        .send({ playerId: hostId, force: true });
       expect(res.status).toBe(200);
     });
 
