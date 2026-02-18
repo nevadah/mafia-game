@@ -177,6 +177,94 @@ describe('REST API', () => {
     });
   });
 
+  describe('POST /games/:gameId/ready', () => {
+    it('marks player as ready', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId } = createRes.body;
+      const res = await request(app)
+        .post(`/games/${gameId}/ready`)
+        .send({ playerId });
+      expect(res.status).toBe(200);
+      expect(res.body.readyCount).toBe(1);
+      expect(res.body.allReady).toBe(false); // need minPlayers ready
+    });
+
+    it('returns 404 for unknown game', async () => {
+      const res = await request(app).post('/games/unknown/ready').send({ playerId: 'x' });
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 for missing playerId', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId } = createRes.body;
+      const res = await request(app).post(`/games/${gameId}/ready`).send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for unknown playerId', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId } = createRes.body;
+      const res = await request(app).post(`/games/${gameId}/ready`).send({ playerId: 'nonexistent' });
+      expect(res.status).toBe(400);
+    });
+
+    it('reports allReady when all minimum players are ready', async () => {
+      const createRes = await request(app)
+        .post('/games')
+        .send({ hostName: 'Alice', settings: { minPlayers: 2 } });
+      const { gameId, playerId: hostId } = createRes.body;
+      const joinRes = await request(app).post(`/games/${gameId}/join`).send({ playerName: 'Bob' });
+      const bobId = joinRes.body.playerId;
+
+      await request(app).post(`/games/${gameId}/ready`).send({ playerId: hostId });
+      const res = await request(app).post(`/games/${gameId}/ready`).send({ playerId: bobId });
+      expect(res.body.allReady).toBe(true);
+    });
+  });
+
+  describe('POST /games/:gameId/unready', () => {
+    it('marks player as not ready', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId } = createRes.body;
+      await request(app).post(`/games/${gameId}/ready`).send({ playerId });
+      const res = await request(app)
+        .post(`/games/${gameId}/unready`)
+        .send({ playerId });
+      expect(res.status).toBe(200);
+      expect(res.body.readyCount).toBe(0);
+      expect(res.body.allReady).toBe(false);
+    });
+
+    it('returns 404 for unknown game', async () => {
+      const res = await request(app).post('/games/unknown/unready').send({ playerId: 'x' });
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 for missing playerId', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId } = createRes.body;
+      const res = await request(app).post(`/games/${gameId}/unready`).send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for unknown playerId', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId } = createRes.body;
+      const res = await request(app).post(`/games/${gameId}/unready`).send({ playerId: 'nonexistent' });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /games includes readyCount', () => {
+    it('returns readyCount in game list', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId } = createRes.body;
+      await request(app).post(`/games/${gameId}/ready`).send({ playerId });
+      const res = await request(app).get('/games');
+      expect(res.body[0].readyCount).toBe(1);
+    });
+  });
+
   describe('POST /games/:gameId/vote', () => {
     async function setupActiveGame() {
       const createRes = await request(app).post('/games').send({ hostName: 'Alice' });

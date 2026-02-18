@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   maxPlayers: 12,
   mafiaRatio: 0.25,
   hasDoctor: true,
-  hasDetective: true
+  hasSheriff: true
 };
 
 export class Game {
@@ -30,6 +30,8 @@ export class Game {
   private savedThisRound?: string;
   private investigatedThisRound?: { target: string; result: Role } | null;
   readonly settings: GameSettings;
+  private readonly createdAt: number;
+  private updatedAt: number;
 
   constructor(hostId: string, settings?: Partial<GameSettings>) {
     this.id = uuidv4();
@@ -41,7 +43,23 @@ export class Game {
     this.votes = new Map();
     this.nightActions = new Map();
     this.settings = { ...DEFAULT_SETTINGS, ...settings };
+    this.createdAt = Date.now();
+    this.updatedAt = this.createdAt;
   }
+
+  private touch(): void {
+    this.updatedAt = Date.now();
+  }
+
+  getCreatedAt(): number {
+    return this.createdAt;
+  }
+
+  getUpdatedAt(): number {
+    return this.updatedAt;
+  }
+
+  // ── Player management ──────────────────────────────────────────────────────
 
   addPlayer(player: Player): void {
     if (this.status !== 'waiting') {
@@ -54,10 +72,15 @@ export class Game {
       throw new Error('Player name already taken');
     }
     this.players.set(player.id, player);
+    this.touch();
   }
 
   removePlayer(playerId: string): void {
-    this.players.delete(playerId);
+    if (this.players.delete(playerId)) {
+      this.votes.delete(playerId);
+      this.nightActions.delete(playerId);
+      this.touch();
+    }
   }
 
   getPlayer(playerId: string): Player | undefined {
@@ -75,6 +98,44 @@ export class Game {
   getPlayerCount(): number {
     return this.players.size;
   }
+
+  // ── Ready status ───────────────────────────────────────────────────────────
+
+  markPlayerReady(playerId: string): void {
+    if (this.status !== 'waiting') {
+      throw new Error('Cannot change ready status after game has started');
+    }
+    const player = this.players.get(playerId);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+    player.markReady();
+    this.touch();
+  }
+
+  markPlayerNotReady(playerId: string): void {
+    if (this.status !== 'waiting') {
+      throw new Error('Cannot change ready status after game has started');
+    }
+    const player = this.players.get(playerId);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+    player.markNotReady();
+    this.touch();
+  }
+
+  getReadyCount(): number {
+    return this.getPlayers().filter(p => p.isReady).length;
+  }
+
+  areAllPlayersReady(): boolean {
+    const players = this.getPlayers();
+    return players.length >= this.settings.minPlayers &&
+      players.every(p => p.isReady);
+  }
+
+  // ── Game lifecycle ─────────────────────────────────────────────────────────
 
   getPhase(): GamePhase {
     return this.phase;
@@ -105,6 +166,7 @@ export class Game {
     this.status = 'active';
     this.phase = 'day';
     this.round = 1;
+    this.touch();
   }
 
   private assignRoles(): void {
@@ -125,8 +187,8 @@ export class Game {
       shuffled[roleIndex++].assignRole('doctor');
     }
 
-    if (this.settings.hasDetective && roleIndex < shuffled.length) {
-      shuffled[roleIndex++].assignRole('detective');
+    if (this.settings.hasSheriff && roleIndex < shuffled.length) {
+      shuffled[roleIndex++].assignRole('sheriff');
     }
 
     for (let i = roleIndex; i < shuffled.length; i++) {
@@ -142,6 +204,8 @@ export class Game {
     }
     return arr;
   }
+
+  // ── Day phase ──────────────────────────────────────────────────────────────
 
   castVote(voterId: string, targetId: string): void {
     if (this.phase !== 'day') {
@@ -159,12 +223,27 @@ export class Game {
       throw new Error('Cannot vote for yourself');
     }
     this.votes.set(voterId, targetId);
+    this.touch();
+  }
+
+  getAliveVoterIds(): string[] {
+    return this.getAlivePlayers().map(p => p.id);
+  }
+
+  getMissingVotePlayerIds(): string[] {
+    const aliveVoterIds = this.getAliveVoterIds();
+    return aliveVoterIds.filter(id => !this.votes.has(id));
+  }
+
+  hasAllRequiredVotes(): boolean {
+    return this.getMissingVotePlayerIds().length === 0;
   }
 
   resolveVotes(): string | null {
     if (this.phase !== 'day') {
       throw new Error('Can only resolve votes during day phase');
     }
+
     const voteCounts = new Map<string, number>();
     for (const targetId of this.votes.values()) {
       voteCounts.set(targetId, (voteCounts.get(targetId) ?? 0) + 1);
@@ -175,25 +254,36 @@ export class Game {
     }
 
     let maxVotes = 0;
-    let eliminated: string | null = null;
+    let topTargets: string[] = [];
     for (const [playerId, count] of voteCounts) {
       if (count > maxVotes) {
         maxVotes = count;
-        eliminated = playerId;
+        topTargets = [playerId];
+      } else if (count === maxVotes) {
+        topTargets.push(playerId);
       }
     }
 
-    if (eliminated) {
-      const player = this.players.get(eliminated);
-      if (player) {
-        player.eliminate();
-        this.eliminatedThisRound = eliminated;
-      }
+    // Explicit tie rule: if two or more players tie for top votes, no one is eliminated.
+    if (topTargets.length !== 1) {
+      this.votes.clear();
+      this.touch();
+      return null;
+    }
+
+    const eliminated = topTargets[0];
+    const player = this.players.get(eliminated);
+    if (player) {
+      player.eliminate();
+      this.eliminatedThisRound = eliminated;
+      this.touch();
     }
 
     this.votes.clear();
     return eliminated;
   }
+
+  // ── Night phase ────────────────────────────────────────────────────────────
 
   submitNightAction(playerId: string, targetId: string): void {
     if (this.phase !== 'night') {
@@ -207,10 +297,25 @@ export class Game {
     if (!target || !target.isAlive) {
       throw new Error('Target is not a valid alive player');
     }
-    if (player.role !== 'mafia' && player.role !== 'doctor' && player.role !== 'detective') {
+    if (player.role !== 'mafia' && player.role !== 'doctor' && player.role !== 'sheriff') {
       throw new Error('Player does not have a night action');
     }
     this.nightActions.set(playerId, targetId);
+    this.touch();
+  }
+
+  getNightActionActorIds(): string[] {
+    return this.getAlivePlayers()
+      .filter(p => p.role === 'mafia' || p.role === 'doctor' || p.role === 'sheriff')
+      .map(p => p.id);
+  }
+
+  getMissingNightActionPlayerIds(): string[] {
+    return this.getNightActionActorIds().filter(id => !this.nightActions.has(id));
+  }
+
+  hasAllRequiredNightActions(): boolean {
+    return this.getMissingNightActionPlayerIds().length === 0;
   }
 
   resolveNightActions(): string | null {
@@ -218,34 +323,53 @@ export class Game {
       throw new Error('Can only resolve night actions during night phase');
     }
 
-    let mafiaTarget: string | undefined;
+    const mafiaVoteCounts = new Map<string, number>();
     let doctorTarget: string | undefined;
-    let detectiveActor: string | undefined;
-    let detectiveTarget: string | undefined;
+    let sheriffActor: string | undefined;
+    let sheriffTarget: string | undefined;
 
     for (const [actorId, targetId] of this.nightActions) {
       const actor = this.players.get(actorId);
       if (!actor) continue;
+
       if (actor.role === 'mafia') {
-        mafiaTarget = targetId;
+        mafiaVoteCounts.set(targetId, (mafiaVoteCounts.get(targetId) ?? 0) + 1);
       } else if (actor.role === 'doctor') {
         doctorTarget = targetId;
-      } else if (actor.role === 'detective') {
-        detectiveActor = actorId;
-        detectiveTarget = targetId;
+      } else if (actor.role === 'sheriff') {
+        sheriffActor = actorId;
+        sheriffTarget = targetId;
       }
     }
 
     this.savedThisRound = undefined;
     this.investigatedThisRound = null;
 
-    if (detectiveTarget && detectiveActor) {
-      const target = this.players.get(detectiveTarget);
+    if (sheriffTarget && sheriffActor) {
+      const target = this.players.get(sheriffTarget);
       if (target) {
         this.investigatedThisRound = {
-          target: detectiveTarget,
+          target: sheriffTarget,
           result: target.role ?? 'townsperson'
         };
+      }
+    }
+
+    let mafiaTarget: string | undefined;
+    if (mafiaVoteCounts.size > 0) {
+      let maxVotes = 0;
+      let topTargets: string[] = [];
+      for (const [targetId, count] of mafiaVoteCounts) {
+        if (count > maxVotes) {
+          maxVotes = count;
+          topTargets = [targetId];
+        } else if (count === maxVotes) {
+          topTargets.push(targetId);
+        }
+      }
+
+      if (topTargets.length === 1) {
+        mafiaTarget = topTargets[0];
       }
     }
 
@@ -264,8 +388,11 @@ export class Game {
     }
 
     this.nightActions.clear();
+    this.touch();
     return eliminated;
   }
+
+  // ── Phase management ───────────────────────────────────────────────────────
 
   advancePhase(): void {
     if (this.status !== 'active') {
@@ -279,7 +406,11 @@ export class Game {
       this.phase = 'day';
       this.round++;
     }
+
+    this.touch();
   }
+
+  // ── Win condition ──────────────────────────────────────────────────────────
 
   checkWinCondition(): 'mafia' | 'town' | null {
     const alive = this.getAlivePlayers();
@@ -290,6 +421,7 @@ export class Game {
       this.winner = 'town';
       this.status = 'ended';
       this.phase = 'ended';
+      this.touch();
       return 'town';
     }
 
@@ -297,11 +429,14 @@ export class Game {
       this.winner = 'mafia';
       this.status = 'ended';
       this.phase = 'ended';
+      this.touch();
       return 'mafia';
     }
 
     return null;
   }
+
+  // ── Accessors ──────────────────────────────────────────────────────────────
 
   getVotes(): Record<string, string> {
     return Object.fromEntries(this.votes);
@@ -315,8 +450,7 @@ export class Game {
     const players = this.getPlayers().map(p => {
       if (
         forPlayerId &&
-        (p.id === forPlayerId ||
-          (this.status === 'ended'))
+        (p.id === forPlayerId || this.status === 'ended')
       ) {
         return p.toData();
       }
@@ -336,7 +470,8 @@ export class Game {
       eliminatedThisRound: this.eliminatedThisRound,
       savedThisRound: this.savedThisRound,
       investigatedThisRound: this.investigatedThisRound,
-      settings: this.settings
+      settings: this.settings,
+      readyCount: this.getReadyCount()
     };
   }
 }

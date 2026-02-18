@@ -8,7 +8,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
     id: 'game-123',
     phase: 'lobby',
     status: 'waiting',
-    players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true }],
+    players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: false }],
     round: 0,
     hostId: 'p1',
     votes: {},
@@ -18,8 +18,9 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
       maxPlayers: 12,
       mafiaRatio: 0.25,
       hasDoctor: true,
-      hasDetective: true
+      hasSheriff: true
     },
+    readyCount: 0,
     ...overrides
   };
 }
@@ -64,6 +65,19 @@ class MockWebSocket implements WebSocketLike {
 
 function makeWsFactory(ws: MockWebSocket): WebSocketFactory {
   return (_url: string) => ws;
+}
+
+/** Helper: create a connected client */
+async function makeConnectedClient(stateOverrides: Partial<GameState> = {}) {
+  const state = makeGameState(stateOverrides);
+  const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+  const ws = new MockWebSocket();
+  const client = new MafiaClient('http://localhost:3000', { fetch, webSocketFactory: makeWsFactory(ws) });
+  await client.createGame('Alice');
+  const connectPromise = client.connect();
+  ws.receive({ type: 'connected', payload: { state } });
+  await connectPromise;
+  return { client, ws, fetch, state };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -140,6 +154,363 @@ describe('MafiaClient — joinGame', () => {
   });
 });
 
+describe('MafiaClient — markReady', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.markReady()).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/ready with playerId', async () => {
+    const state = makeGameState();
+    const readyState = makeGameState({ readyCount: 1 });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { allReady: false, readyCount: 1, state: readyState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+
+    const result = await client.markReady();
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/ready');
+    expect(result.readyCount).toBe(1);
+    expect(result.allReady).toBe(false);
+    expect(client.gameState).toEqual(readyState);
+  });
+
+  it('reports allReady true when all players ready', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { allReady: true, readyCount: 4, state } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.markReady();
+    expect(result.allReady).toBe(true);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Player not found' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.markReady()).rejects.toThrow('Player not found');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.markReady()).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — markUnready', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.markUnready()).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/unready and updates state', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { allReady: false, readyCount: 0, state } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await client.markUnready();
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/unready');
+    expect(client.gameState).toEqual(state);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Player not found' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.markUnready()).rejects.toThrow('Player not found');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.markUnready()).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — startGame', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.startGame()).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/start and stores state', async () => {
+    const state = makeGameState();
+    const activeState = makeGameState({ status: 'active', phase: 'day', round: 1 });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { state: activeState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.startGame();
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/start');
+    expect(result.status).toBe('active');
+    expect(client.gameState?.status).toBe('active');
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Need at least 4 players' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.startGame()).rejects.toThrow('Need at least 4 players');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.startGame()).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — castVote', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.castVote('p2')).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/vote with voterId and targetId', async () => {
+    const state = makeGameState({ status: 'active', phase: 'day' });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { state } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.castVote('p2');
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/vote');
+    const body = JSON.parse((fetch.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.voterId).toBe('p1');
+    expect(body.targetId).toBe('p2');
+    expect(result).toEqual(state);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Cannot vote for yourself' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.castVote('p1')).rejects.toThrow('Cannot vote for yourself');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.castVote('p2')).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — submitNightAction', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.submitNightAction('p2')).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/night-action', async () => {
+    const state = makeGameState({ status: 'active', phase: 'night' });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { state } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.submitNightAction('p2');
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/night-action');
+    const body = JSON.parse((fetch.mock.calls[1][1] as RequestInit).body as string);
+    expect(body.playerId).toBe('p1');
+    expect(body.targetId).toBe('p2');
+    expect(result).toEqual(state);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Night actions only allowed during night phase' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.submitNightAction('p2')).rejects.toThrow('Night actions only allowed during night phase');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.submitNightAction('p2')).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — resolveVotes', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.resolveVotes()).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/resolve-votes and returns result', async () => {
+    const state = makeGameState({ status: 'active', phase: 'day' });
+    const nightState = makeGameState({ status: 'active', phase: 'night' });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { eliminated: 'p2', winner: null, state: nightState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.resolveVotes();
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/resolve-votes');
+    expect(result.eliminated).toBe('p2');
+    expect(result.winner).toBeNull();
+    expect(client.gameState?.phase).toBe('night');
+  });
+
+  it('returns winner when game ends', async () => {
+    const state = makeGameState({ status: 'active', phase: 'day' });
+    const endState = makeGameState({ status: 'ended', phase: 'ended', winner: 'town' });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { eliminated: 'p2', winner: 'town', state: endState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.resolveVotes();
+    expect(result.winner).toBe('town');
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Only the host can resolve votes' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.resolveVotes()).rejects.toThrow('Only the host can resolve votes');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.resolveVotes()).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — resolveNight', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.resolveNight()).rejects.toThrow('Not in a game');
+  });
+
+  it('POST /games/:id/resolve-night and returns result', async () => {
+    const state = makeGameState({ status: 'active', phase: 'night' });
+    const dayState = makeGameState({ status: 'active', phase: 'day', round: 2 });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { eliminated: 'p3', winner: null, state: dayState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.resolveNight();
+
+    expect(fetch.mock.calls[1][0]).toContain('/games/g1/resolve-night');
+    expect(result.eliminated).toBe('p3');
+    expect(result.winner).toBeNull();
+    expect(client.gameState?.phase).toBe('day');
+  });
+
+  it('returns winner when mafia wins', async () => {
+    const state = makeGameState({ status: 'active', phase: 'night' });
+    const endState = makeGameState({ status: 'ended', phase: 'ended', winner: 'mafia' });
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { eliminated: 'p2', winner: 'mafia', state: endState } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const result = await client.resolveNight();
+    expect(result.winner).toBe('mafia');
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Only the host can resolve night actions' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.resolveNight()).rejects.toThrow('Only the host can resolve night actions');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: {} }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.resolveNight()).rejects.toThrow('Server error 400');
+  });
+});
+
 describe('MafiaClient — fetchGameState', () => {
   it('throws when not in a game', async () => {
     const fetch = makeFetch([]);
@@ -176,7 +547,7 @@ describe('MafiaClient — fetchGameState', () => {
 
 describe('MafiaClient — listGames', () => {
   it('GET /games and returns list', async () => {
-    const list = [{ gameId: 'g1', playerCount: 2 }];
+    const list = [{ gameId: 'g1', playerCount: 2, readyCount: 1 }];
     const fetch = makeFetch([{ ok: true, body: list }]);
     const client = new MafiaClient('http://localhost:3000', { fetch });
 
@@ -192,6 +563,125 @@ describe('MafiaClient — listGames', () => {
   });
 });
 
+describe('MafiaClient — getMyRole', () => {
+  it('returns undefined when not in a game', () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    expect(client.getMyRole()).toBeUndefined();
+  });
+
+  it('returns undefined when player has no role (lobby)', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getMyRole()).toBeUndefined();
+  });
+
+  it('returns the role when assigned', async () => {
+    const state = makeGameState({
+      status: 'active',
+      phase: 'day',
+      players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'sheriff' }]
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getMyRole()).toBe('sheriff');
+  });
+
+  it('returns mafia role when assigned mafia', async () => {
+    const state = makeGameState({
+      status: 'active',
+      phase: 'day',
+      players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'mafia' }]
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getMyRole()).toBe('mafia');
+  });
+
+  it('returns doctor role when assigned doctor', async () => {
+    const state = makeGameState({
+      status: 'active',
+      phase: 'day',
+      players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'doctor' }]
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getMyRole()).toBe('doctor');
+  });
+
+  it('returns townsperson role when assigned townsperson', async () => {
+    const state = makeGameState({
+      status: 'active',
+      phase: 'day',
+      players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'townsperson' }]
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getMyRole()).toBe('townsperson');
+  });
+});
+
+describe('MafiaClient — getEndGameSummary', () => {
+  it('returns null when game not ended', async () => {
+    const state = makeGameState({ status: 'active', phase: 'day' });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getEndGameSummary()).toBeNull();
+  });
+
+  it('returns null when not in a game', () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    expect(client.getEndGameSummary()).toBeNull();
+  });
+
+  it('returns null when status is ended but no winner', async () => {
+    const state = makeGameState({ status: 'ended', phase: 'ended' });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.getEndGameSummary()).toBeNull();
+  });
+
+  it('returns summary with winner and players when town wins', async () => {
+    const state = makeGameState({
+      status: 'ended',
+      phase: 'ended',
+      winner: 'town',
+      players: [
+        { id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'sheriff' },
+        { id: 'p2', name: 'Bob', isAlive: false, isConnected: false, isReady: true, role: 'mafia' }
+      ]
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const summary = client.getEndGameSummary();
+    expect(summary).not.toBeNull();
+    expect(summary!.winner).toBe('town');
+    expect(summary!.players).toHaveLength(2);
+    expect(summary!.players.find(p => p.id === 'p2')?.role).toBe('mafia');
+  });
+
+  it('returns summary with mafia winner', async () => {
+    const state = makeGameState({
+      status: 'ended',
+      phase: 'ended',
+      winner: 'mafia'
+    });
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    const summary = client.getEndGameSummary();
+    expect(summary!.winner).toBe('mafia');
+  });
+});
+
 describe('MafiaClient — connect (WebSocket)', () => {
   it('rejects when not in a game', async () => {
     const client = new MafiaClient('http://localhost:3000', {
@@ -202,20 +692,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('resolves when server sends connected message', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
-
+    const { client } = await makeConnectedClient();
     expect(client.isConnected()).toBe(true);
   });
 
@@ -223,11 +700,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
     const state = makeGameState();
     const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
     const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
+    const client = new MafiaClient('http://localhost:3000', { fetch, webSocketFactory: makeWsFactory(ws) });
     await client.createGame('Alice');
 
     const updates: GameState[] = [];
@@ -242,42 +715,19 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('emits state_update on game_state message', async () => {
-    const state = makeGameState();
     const newState = makeGameState({ phase: 'day', round: 1 });
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const updates: GameState[] = [];
     client.on('state_update', (s) => updates.push(s));
-
     ws.receive({ type: 'game_state', payload: { state: newState } });
     expect(updates[0]).toEqual(newState);
     expect(client.gameState).toEqual(newState);
   });
 
   it('emits state_update on phase_changed message', async () => {
-    const state = makeGameState();
     const newState = makeGameState({ phase: 'night' });
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const updates: GameState[] = [];
     client.on('state_update', (s) => updates.push(s));
@@ -285,19 +735,54 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(updates[0]).toEqual(newState);
   });
 
-  it('emits player_joined event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
+  it('emits state_update and game_started on game_started message', async () => {
+    const activeState = makeGameState({ status: 'active', phase: 'day', round: 1 });
+    const { client, ws } = await makeConnectedClient();
 
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const stateUpdates: GameState[] = [];
+    const startedEvents: unknown[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    client.on('game_started', (p) => startedEvents.push(p));
+
+    ws.receive({ type: 'game_started', payload: { state: activeState } });
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0].status).toBe('active');
+    expect(startedEvents).toHaveLength(1);
+    expect(client.gameState?.phase).toBe('day');
+  });
+
+  it('handles game_started without state payload', async () => {
+    const { client, ws } = await makeConnectedClient();
+
+    const startedEvents: unknown[] = [];
+    client.on('game_started', (p) => startedEvents.push(p));
+    ws.receive({ type: 'game_started', payload: {} });
+    expect(startedEvents).toHaveLength(1);
+  });
+
+  it('emits player_ready and updates state on player_ready message', async () => {
+    const readyState = makeGameState({ readyCount: 1 });
+    const { client, ws } = await makeConnectedClient();
+
+    const readyEvents: unknown[] = [];
+    client.on('player_ready', (p) => readyEvents.push(p));
+    ws.receive({ type: 'player_ready', payload: { playerId: 'p1', readyCount: 1, allReady: false, state: readyState } });
+
+    expect(readyEvents).toHaveLength(1);
+    expect(client.gameState?.readyCount).toBe(1);
+  });
+
+  it('handles player_ready without state payload', async () => {
+    const { client, ws } = await makeConnectedClient();
+
+    const readyEvents: unknown[] = [];
+    client.on('player_ready', (p) => readyEvents.push(p));
+    ws.receive({ type: 'player_ready', payload: { playerId: 'p1', readyCount: 1 } });
+    expect(readyEvents).toHaveLength(1);
+  });
+
+  it('emits player_joined event', async () => {
+    const { client, ws } = await makeConnectedClient();
 
     const events: unknown[] = [];
     client.on('player_joined', (p) => events.push(p));
@@ -306,18 +791,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('emits player_left event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const events: unknown[] = [];
     client.on('player_left', (p) => events.push(p));
@@ -326,18 +800,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('emits vote_cast event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const events: unknown[] = [];
     client.on('vote_cast', (p) => events.push(p));
@@ -346,18 +809,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('emits player_eliminated event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const events: unknown[] = [];
     client.on('player_eliminated', (p) => events.push(p));
@@ -365,39 +817,25 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(events).toHaveLength(1);
   });
 
-  it('emits game_ended event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
+  it('emits game_ended event and summary is available', async () => {
+    const endedState = makeGameState({
+      status: 'ended',
+      phase: 'ended',
+      winner: 'town',
+      players: [
+        { id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: true, role: 'sheriff' }
+      ]
     });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const events: unknown[] = [];
     client.on('game_ended', (p) => events.push(p));
-    ws.receive({ type: 'game_ended', payload: { winner: 'town' } });
+    ws.receive({ type: 'game_ended', payload: { winner: 'town', state: endedState } });
     expect(events).toHaveLength(1);
   });
 
   it('emits server_error event', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const errors: unknown[] = [];
     client.on('server_error', (e) => errors.push(e));
@@ -406,57 +844,21 @@ describe('MafiaClient — connect (WebSocket)', () => {
   });
 
   it('ignores messages with no payload state for state-bearing types', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const updates: GameState[] = [];
     client.on('state_update', (s) => updates.push(s));
-    // game_state with no state in payload — should not emit
     ws.receive({ type: 'game_state', payload: {} });
     expect(updates).toHaveLength(0);
   });
 
   it('ignores malformed JSON messages', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
-
-    // Fire a raw invalid JSON message — should not throw
+    const { ws } = await makeConnectedClient();
     expect(() => ws.fire('message', { data: 'not-json{' })).not.toThrow();
   });
 
   it('emits disconnected on WebSocket close', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
+    const { client, ws } = await makeConnectedClient();
 
     const disconnected: boolean[] = [];
     client.on('disconnected', () => disconnected.push(true));
@@ -468,10 +870,7 @@ describe('MafiaClient — connect (WebSocket)', () => {
     const state = makeGameState();
     const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
     const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
+    const client = new MafiaClient('http://localhost:3000', { fetch, webSocketFactory: makeWsFactory(ws) });
 
     await client.createGame('Alice');
     const connectPromise = client.connect();
@@ -482,28 +881,14 @@ describe('MafiaClient — connect (WebSocket)', () => {
 
 describe('MafiaClient — disconnect', () => {
   it('closes WebSocket and isConnected returns false', async () => {
-    const state = makeGameState();
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
-    const ws = new MockWebSocket();
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch,
-      webSocketFactory: makeWsFactory(ws)
-    });
-
-    await client.createGame('Alice');
-    const connectPromise = client.connect();
-    ws.receive({ type: 'connected', payload: { state } });
-    await connectPromise;
-
+    const { client } = await makeConnectedClient();
     expect(client.isConnected()).toBe(true);
     client.disconnect();
     expect(client.isConnected()).toBe(false);
   });
 
   it('is safe to call when not connected', () => {
-    const client = new MafiaClient('http://localhost:3000', {
-      fetch: makeFetch([])
-    });
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
     expect(() => client.disconnect()).not.toThrow();
   });
 });

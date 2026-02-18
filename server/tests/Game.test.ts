@@ -40,6 +40,7 @@ describe('Game', () => {
       const game = new Game('host');
       expect(game.settings.minPlayers).toBe(4);
       expect(game.settings.maxPlayers).toBe(12);
+      expect(game.settings.hasSheriff).toBe(true);
     });
 
     it('merges custom settings', () => {
@@ -109,6 +110,94 @@ describe('Game', () => {
     });
   });
 
+  // ── Ready status ───────────────────────────────────────────────────────────
+
+  describe('markPlayerReady', () => {
+    it('marks player as ready', () => {
+      const { game, players } = makeGame(4);
+      game.markPlayerReady(players[0].id);
+      expect(players[0].isReady).toBe(true);
+    });
+
+    it('throws for unknown player', () => {
+      const { game } = makeGame(4);
+      expect(() => game.markPlayerReady('unknown')).toThrow('Player not found');
+    });
+
+    it('throws after game has started', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      expect(() => game.markPlayerReady(players[0].id)).toThrow(
+        'Cannot change ready status after game has started'
+      );
+    });
+  });
+
+  describe('markPlayerNotReady', () => {
+    it('marks player as not ready', () => {
+      const { game, players } = makeGame(4);
+      game.markPlayerReady(players[0].id);
+      game.markPlayerNotReady(players[0].id);
+      expect(players[0].isReady).toBe(false);
+    });
+
+    it('throws for unknown player', () => {
+      const { game } = makeGame(4);
+      expect(() => game.markPlayerNotReady('unknown')).toThrow('Player not found');
+    });
+
+    it('throws after game has started', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      expect(() => game.markPlayerNotReady(players[0].id)).toThrow(
+        'Cannot change ready status after game has started'
+      );
+    });
+  });
+
+  describe('getReadyCount', () => {
+    it('returns 0 initially', () => {
+      const { game } = makeGame(4);
+      expect(game.getReadyCount()).toBe(0);
+    });
+
+    it('returns count of ready players', () => {
+      const { game, players } = makeGame(4);
+      game.markPlayerReady(players[0].id);
+      game.markPlayerReady(players[1].id);
+      expect(game.getReadyCount()).toBe(2);
+    });
+  });
+
+  describe('areAllPlayersReady', () => {
+    it('returns false when no players are ready', () => {
+      const { game } = makeGame(4);
+      expect(game.areAllPlayersReady()).toBe(false);
+    });
+
+    it('returns false when only some players are ready', () => {
+      const { game, players } = makeGame(4);
+      game.markPlayerReady(players[0].id);
+      expect(game.areAllPlayersReady()).toBe(false);
+    });
+
+    it('returns true when all players are ready and meets minPlayers', () => {
+      const { game, players } = makeGame(4);
+      for (const p of players) game.markPlayerReady(p.id);
+      expect(game.areAllPlayersReady()).toBe(true);
+    });
+
+    it('returns false when all ready but below minPlayers', () => {
+      const game = new Game('host', { minPlayers: 4 });
+      const p = new Player('p1', 'Alice');
+      game.addPlayer(p);
+      game.markPlayerReady(p.id);
+      expect(game.areAllPlayersReady()).toBe(false);
+    });
+  });
+
+  // ── Start ──────────────────────────────────────────────────────────────────
+
   describe('start', () => {
     it('starts the game successfully', () => {
       const { game } = makeGame(4);
@@ -159,13 +248,22 @@ describe('Game', () => {
       expect(doctorCount).toBe(0);
     });
 
-    it('assigns detective when hasDetective is true', () => {
+    it('assigns sheriff when hasSheriff is true', () => {
       const { game, players } = makeGame(6);
       game.start();
-      const detectiveCount = players.filter(p => p.role === 'detective').length;
-      expect(detectiveCount).toBe(1);
+      const sheriffCount = players.filter(p => p.role === 'sheriff').length;
+      expect(sheriffCount).toBe(1);
+    });
+
+    it('skips sheriff when hasSheriff is false', () => {
+      const { game, players } = makeGame(6, { hasSheriff: false });
+      game.start();
+      const sheriffCount = players.filter(p => p.role === 'sheriff').length;
+      expect(sheriffCount).toBe(0);
     });
   });
+
+  // ── Day voting ─────────────────────────────────────────────────────────────
 
   describe('castVote', () => {
     it('records a vote', () => {
@@ -179,7 +277,7 @@ describe('Game', () => {
     it('throws when not in day phase', () => {
       const { game, players } = makeGame(4);
       game.start();
-      game.advancePhase(); // moves to night
+      game.advancePhase();
       expect(() => game.castVote(players[0].id, players[1].id)).toThrow(
         'Voting is only allowed during the day phase'
       );
@@ -242,7 +340,7 @@ describe('Game', () => {
     it('throws when not in day phase', () => {
       const { game } = makeGame(4);
       game.start();
-      game.advancePhase(); // move to night
+      game.advancePhase();
       expect(() => game.resolveVotes()).toThrow('Can only resolve votes during day phase');
     });
 
@@ -254,6 +352,8 @@ describe('Game', () => {
       expect(Object.keys(game.getVotes()).length).toBe(0);
     });
   });
+
+  // ── Phase management ───────────────────────────────────────────────────────
 
   describe('advancePhase', () => {
     it('advances from day to night', () => {
@@ -267,8 +367,8 @@ describe('Game', () => {
     it('advances from night to day and increments round', () => {
       const { game } = makeGame(4);
       game.start();
-      game.advancePhase(); // day -> night
-      game.advancePhase(); // night -> day
+      game.advancePhase();
+      game.advancePhase();
       expect(game.getPhase()).toBe('day');
       expect(game.getRound()).toBe(2);
     });
@@ -279,17 +379,30 @@ describe('Game', () => {
     });
   });
 
+  // ── Night actions ──────────────────────────────────────────────────────────
+
   describe('submitNightAction', () => {
-    it('records a night action', () => {
+    it('records a night action for mafia', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase(); // move to night
+      game.advancePhase();
 
       const mafia = players.find(p => p.role === 'mafia')!;
       const target = players.find(p => p.role !== 'mafia')!;
       game.submitNightAction(mafia.id, target.id);
       const actions = game.getNightActions();
       expect(actions[mafia.id]).toBe(target.id);
+    });
+
+    it('records a night action for sheriff', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      game.advancePhase();
+
+      const sheriff = players.find(p => p.role === 'sheriff')!;
+      const target = players.find(p => p !== sheriff)!;
+      game.submitNightAction(sheriff.id, target.id);
+      expect(game.getNightActions()[sheriff.id]).toBe(target.id);
     });
 
     it('throws when not in night phase', () => {
@@ -375,15 +488,15 @@ describe('Game', () => {
       expect(town.isAlive).toBe(true);
     });
 
-    it('detective investigates a player', () => {
+    it('sheriff investigates a player', () => {
       const { game, players } = makeGame(6);
       game.start();
       game.advancePhase();
-      const detective = players.find(p => p.role === 'detective')!;
+      const sheriff = players.find(p => p.role === 'sheriff')!;
       const mafia = players.find(p => p.role === 'mafia')!;
-      game.submitNightAction(detective.id, mafia.id);
+      game.submitNightAction(sheriff.id, mafia.id);
       game.resolveNightActions();
-      const state = game.toState(detective.id);
+      const state = game.toState(sheriff.id);
       expect(state.investigatedThisRound).toBeDefined();
       expect(state.investigatedThisRound?.result).toBe('mafia');
     });
@@ -405,6 +518,8 @@ describe('Game', () => {
     });
   });
 
+  // ── Win conditions ─────────────────────────────────────────────────────────
+
   describe('checkWinCondition', () => {
     it('returns town when no mafia alive', () => {
       const { game, players } = makeGame(4);
@@ -421,7 +536,6 @@ describe('Game', () => {
       const { game, players } = makeGame(4);
       game.start();
       const townPlayers = players.filter(p => p.role !== 'mafia');
-      // eliminate all but one townsperson
       townPlayers.slice(1).forEach(p => p.eliminate());
       const winner = game.checkWinCondition();
       expect(winner).toBe('mafia');
@@ -443,6 +557,8 @@ describe('Game', () => {
     });
   });
 
+  // ── toState ────────────────────────────────────────────────────────────────
+
   describe('toState', () => {
     it('returns game state object', () => {
       const { game } = makeGame(4);
@@ -451,6 +567,13 @@ describe('Game', () => {
       expect(state.phase).toBe('lobby');
       expect(state.status).toBe('waiting');
       expect(state.players.length).toBe(4);
+    });
+
+    it('includes readyCount in state', () => {
+      const { game, players } = makeGame(4);
+      game.markPlayerReady(players[0].id);
+      const state = game.toState();
+      expect(state.readyCount).toBe(1);
     });
 
     it('includes role for the requesting player', () => {

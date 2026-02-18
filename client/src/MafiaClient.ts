@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { GameState, ServerMessage, FetchLike } from './types';
+import { GameState, EndGameSummary, Role, ServerMessage, FetchLike } from './types';
 
 export type WebSocketLike = {
   readyState: number;
@@ -22,13 +22,16 @@ export interface MafiaClientOptions {
  * MafiaClient — core client logic for connecting to the Mafia game server.
  *
  * Emits:
- *   'state_update'   (gameState: GameState)  — when any state-bearing message arrives
- *   'player_joined'  (payload)
- *   'player_left'    (payload)
- *   'vote_cast'      (payload)
- *   'game_ended'     (payload)
- *   'server_error'   (payload)
- *   'disconnected'   ()
+ *   'state_update'     (gameState: GameState)  — when any state-bearing message arrives
+ *   'player_joined'    (payload)
+ *   'player_left'      (payload)
+ *   'player_ready'     (payload)
+ *   'player_eliminated'(payload)
+ *   'vote_cast'        (payload)
+ *   'game_started'     (payload)
+ *   'game_ended'       (payload)
+ *   'server_error'     (payload)
+ *   'disconnected'     ()
  */
 export class MafiaClient extends EventEmitter {
   private readonly baseUrl: string;
@@ -39,6 +42,7 @@ export class MafiaClient extends EventEmitter {
   private ws?: WebSocketLike;
   private _gameId?: string;
   private _playerId?: string;
+  private _token?: string;
   private _gameState?: GameState;
 
   constructor(serverUrl: string, options: MafiaClientOptions = {}) {
@@ -63,13 +67,43 @@ export class MafiaClient extends EventEmitter {
 
   get gameId(): string | undefined { return this._gameId; }
   get playerId(): string | undefined { return this._playerId; }
+  get token(): string | undefined { return this._token; }
   get gameState(): GameState | undefined { return this._gameState; }
 
   isConnected(): boolean {
     return !!this.ws && this.ws.readyState === 1; // WebSocket.OPEN
   }
 
+  /**
+   * Returns the current player's role from the game state, or undefined if
+   * not yet assigned (lobby) or not the player's own data.
+   */
+  getMyRole(): Role | undefined {
+    if (!this._gameState || !this._playerId) return undefined;
+    const me = this._gameState.players.find(p => p.id === this._playerId);
+    return me?.role;
+  }
+
+  /**
+   * Returns the end-game summary when the game has ended, or null otherwise.
+   */
+  getEndGameSummary(): EndGameSummary | null {
+    if (!this._gameState || this._gameState.status !== 'ended') return null;
+    if (!this._gameState.winner) return null;
+    return {
+      winner: this._gameState.winner,
+      players: this._gameState.players
+    };
+  }
+
   // ── HTTP API ─────────────────────────────────────────────────────────────
+
+  private authHeaders(): Record<string, string> {
+    if (!this._token) {
+      return {};
+    }
+    return { 'x-player-token': this._token };
+  }
 
   /**
    * Create a new game and become the host.
@@ -86,9 +120,10 @@ export class MafiaClient extends EventEmitter {
       throw new Error(err.error ?? `Server error ${res.status}`);
     }
 
-    const data = await res.json() as { gameId: string; playerId: string; state: GameState };
+    const data = await res.json() as { gameId: string; playerId: string; token?: string; state: GameState };
     this._gameId = data.gameId;
     this._playerId = data.playerId;
+    this._token = data.token;
     this._gameState = data.state;
     return data.state;
   }
@@ -108,11 +143,169 @@ export class MafiaClient extends EventEmitter {
       throw new Error(err.error ?? `Server error ${res.status}`);
     }
 
-    const data = await res.json() as { playerId: string; state: GameState };
+    const data = await res.json() as { playerId: string; token?: string; state: GameState };
     this._gameId = gameId;
     this._playerId = data.playerId;
+    this._token = data.token;
     this._gameState = data.state;
     return data.state;
+  }
+
+  /**
+   * Mark the current player as ready.
+   */
+  async markReady(): Promise<{ allReady: boolean; readyCount: number }> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { allReady: boolean; readyCount: number; state: GameState };
+    this._gameState = data.state;
+    return { allReady: data.allReady, readyCount: data.readyCount };
+  }
+
+  /**
+   * Mark the current player as not ready.
+   */
+  async markUnready(): Promise<void> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/unready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { state: GameState };
+    this._gameState = data.state;
+  }
+
+  /**
+   * Start the game (host only).
+   */
+  async startGame(): Promise<GameState> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { state: GameState };
+    this._gameState = data.state;
+    return data.state;
+  }
+
+  /**
+   * Cast a vote during the day phase.
+   */
+  async castVote(targetId: string): Promise<GameState> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ voterId: this._playerId, targetId })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { state: GameState };
+    this._gameState = data.state;
+    return data.state;
+  }
+
+  /**
+   * Submit a night action (mafia kill, doctor save, or sheriff investigate).
+   */
+  async submitNightAction(targetId: string): Promise<GameState> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/night-action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId, targetId })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { state: GameState };
+    this._gameState = data.state;
+    return data.state;
+  }
+
+  /**
+   * Resolve day votes and advance phase (host only).
+   */
+  async resolveVotes(force = false): Promise<{ eliminated: string | null; winner: 'mafia' | 'town' | null }> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/resolve-votes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId, force })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { eliminated: string | null; winner: 'mafia' | 'town' | null; state: GameState };
+    this._gameState = data.state;
+    return { eliminated: data.eliminated, winner: data.winner };
+  }
+
+  /**
+   * Resolve night actions and advance phase (host only).
+   */
+  async resolveNight(force = false): Promise<{ eliminated: string | null; winner: 'mafia' | 'town' | null }> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/resolve-night`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId, force })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { eliminated: string | null; winner: 'mafia' | 'town' | null; state: GameState };
+    this._gameState = data.state;
+    return { eliminated: data.eliminated, winner: data.winner };
+  }
+
+  /**
+   * Leave the current game.
+   */
+  async leaveGame(): Promise<{ deletedGame: boolean }> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/leave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ playerId: this._playerId })
+    });
+
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+
+    const data = await res.json() as { deletedGame: boolean };
+    this.disconnect();
+    this._gameId = undefined;
+    this._playerId = undefined;
+    this._token = undefined;
+    this._gameState = undefined;
+    return data;
   }
 
   /**
@@ -122,7 +315,9 @@ export class MafiaClient extends EventEmitter {
     if (!this._gameId) throw new Error('Not in a game');
 
     const url = `${this.baseUrl}/games/${this._gameId}?playerId=${this._playerId ?? ''}`;
-    const res = await this.fetchImpl(url);
+    const res = await this.fetchImpl(url, {
+      headers: this.authHeaders()
+    });
 
     if (!res.ok) {
       throw new Error(`Failed to fetch game state: ${res.status}`);
@@ -136,10 +331,10 @@ export class MafiaClient extends EventEmitter {
   /**
    * List games waiting for players.
    */
-  async listGames(): Promise<Array<{ gameId: string; playerCount: number }>> {
+  async listGames(): Promise<Array<{ gameId: string; playerCount: number; readyCount: number }>> {
     const res = await this.fetchImpl(`${this.baseUrl}/games`);
     if (!res.ok) throw new Error(`Failed to list games: ${res.status}`);
-    return res.json() as Promise<Array<{ gameId: string; playerCount: number }>>;
+    return res.json() as Promise<Array<{ gameId: string; playerCount: number; readyCount: number }>>;
   }
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
@@ -154,12 +349,21 @@ export class MafiaClient extends EventEmitter {
     }
 
     return new Promise((resolve, reject) => {
-      const url = `${this.wsUrl}/?gameId=${this._gameId}&playerId=${this._playerId ?? ''}`;
+      const params = new URLSearchParams();
+      params.set('gameId', this._gameId!);
+      if (this._playerId) params.set('playerId', this._playerId);
+      if (this._token) params.set('token', this._token);
+
+      const url = `${this.wsUrl}/?${params.toString()}`;
       const ws = this.wsFactory(url);
       this.ws = ws;
 
+      let resolved = false;
       const onConnectedOnce = (msg: ServerMessage) => {
-        if (msg.type === 'connected') resolve();
+        if (!resolved && msg.type === 'connected') {
+          resolved = true;
+          resolve();
+        }
       };
 
       ws.addEventListener('message', (event?: unknown) => {
@@ -200,6 +404,23 @@ export class MafiaClient extends EventEmitter {
           this._gameState = p.state;
           this.emit('state_update', this._gameState);
         }
+        break;
+      }
+      case 'game_started': {
+        const p = msg.payload as { state?: GameState } | undefined;
+        if (p?.state) {
+          this._gameState = p.state;
+          this.emit('state_update', this._gameState);
+        }
+        this.emit('game_started', msg.payload);
+        break;
+      }
+      case 'player_ready': {
+        const p = msg.payload as { state?: GameState } | undefined;
+        if (p?.state) {
+          this._gameState = p.state;
+        }
+        this.emit('player_ready', msg.payload);
         break;
       }
       case 'player_joined':

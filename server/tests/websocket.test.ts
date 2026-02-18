@@ -292,6 +292,55 @@ describe('WebSocket Server', () => {
     expect(leaveMsg.type).toBe('player_left');
   });
 
+  it('handles mark_ready message and broadcasts player_ready', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob } = gameManager.joinGame(game.id, 'Bob');
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage(); // Bob connected
+    await aliceClient.getNextMessage(); // Alice gets player_joined
+
+    // Bob marks ready
+    bobClient.ws.send(JSON.stringify({ type: 'mark_ready' }));
+    const msg = await aliceClient.getNextMessage();
+    expect(msg.type).toBe('player_ready');
+    const payload = msg.payload as Record<string, unknown>;
+    expect(payload.playerId).toBe(bob.id);
+    expect(payload.readyCount).toBe(1);
+  });
+
+  it('handles mark_ready error when game is active', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    gameManager.joinGame(game.id, 'Bob');
+    gameManager.joinGame(game.id, 'Carol');
+    gameManager.joinGame(game.id, 'Dave');
+    game.start(); // status becomes 'active'
+
+    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await client.getNextMessage(); // connected
+
+    client.ws.send(JSON.stringify({ type: 'mark_ready' }));
+    const msg = await client.getNextMessage();
+    expect(msg.type).toBe('error');
+  });
+
+  it('handles mark_ready without playerId (no-op)', async () => {
+    const { game } = gameManager.createGame('Alice');
+
+    // Connect without a playerId
+    const client = await connect(`/?gameId=${game.id}`);
+    await client.getNextMessage(); // connected
+
+    client.ws.send(JSON.stringify({ type: 'mark_ready' }));
+    // No-op - verify socket still open by doing get_state
+    client.ws.send(JSON.stringify({ type: 'get_state' }));
+    const msg = await client.getNextMessage();
+    expect(msg.type).toBe('game_state');
+  });
+
   it('handles message without gameId context silently', async () => {
     const client = await connect('/');
     await client.getNextMessage(); // connected (no gameId)

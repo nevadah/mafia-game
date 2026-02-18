@@ -18,6 +18,10 @@ describe('Player', () => {
       expect(player.isConnected).toBe(true);
     });
 
+    it('starts not ready', () => {
+      expect(player.isReady).toBe(false);
+    });
+
     it('starts with no role', () => {
       expect(player.role).toBeUndefined();
     });
@@ -39,9 +43,9 @@ describe('Player', () => {
       expect(player.role).toBe('doctor');
     });
 
-    it('assigns detective role', () => {
-      player.assignRole('detective');
-      expect(player.role).toBe('detective');
+    it('assigns sheriff role', () => {
+      player.assignRole('sheriff');
+      expect(player.role).toBe('sheriff');
     });
   });
 
@@ -65,28 +69,45 @@ describe('Player', () => {
     });
   });
 
+  describe('markReady / markNotReady', () => {
+    it('markReady sets isReady to true', () => {
+      player.markReady();
+      expect(player.isReady).toBe(true);
+    });
+
+    it('markNotReady sets isReady to false', () => {
+      player.markReady();
+      player.markNotReady();
+      expect(player.isReady).toBe(false);
+    });
+  });
+
   describe('toData', () => {
-    it('returns full player data including role', () => {
-      player.assignRole('detective');
+    it('returns full player data including role and isReady', () => {
+      player.assignRole('sheriff');
+      player.markReady();
       const data = player.toData();
       expect(data).toEqual({
         id: 'test-id',
         name: 'Alice',
-        role: 'detective',
+        role: 'sheriff',
         isAlive: true,
-        isConnected: true
+        isConnected: true,
+        isReady: true
       });
     });
   });
 
   describe('toPublicData', () => {
-    it('returns public data without role', () => {
+    it('returns public data without role, but with isReady', () => {
       player.assignRole('mafia');
+      player.markReady();
       const data = player.toPublicData();
       expect(data.role).toBeUndefined();
       expect(data.id).toBe('test-id');
       expect(data.name).toBe('Alice');
       expect(data.isAlive).toBe(true);
+      expect(data.isReady).toBe(true);
     });
   });
 });

@@ -1,4 +1,4 @@
-export type Role = 'mafia' | 'townsperson' | 'doctor' | 'detective';
+export type Role = 'mafia' | 'townsperson' | 'doctor' | 'sheriff';
 
 export type GamePhase = 'lobby' | 'day' | 'night' | 'ended';
 
@@ -10,6 +10,7 @@ export interface PlayerData {
   role?: Role;
   isAlive: boolean;
   isConnected: boolean;
+  isReady: boolean;
 }
 
 export interface GameState {
@@ -26,6 +27,7 @@ export interface GameState {
   savedThisRound?: string;
   investigatedThisRound?: { target: string; result: Role } | null;
   settings: GameSettings;
+  readyCount: number;
 }
 
 export interface GameSettings {
@@ -33,7 +35,7 @@ export interface GameSettings {
   maxPlayers: number;
   mafiaRatio: number;
   hasDoctor: boolean;
-  hasDetective: boolean;
+  hasSheriff: boolean;
 }
 
 export interface CreateGameRequest {
@@ -46,13 +48,21 @@ export interface JoinGameRequest {
 }
 
 export interface VoteRequest {
-  voterId: string;
+  voterId?: string;
   targetId: string;
 }
 
 export interface NightActionRequest {
-  playerId: string;
+  playerId?: string;
   targetId: string;
+}
+
+export interface ReadyRequest {
+  playerId?: string;
+}
+
+export interface LeaveRequest {
+  playerId?: string;
 }
 
 export interface WebSocketMessage {
@@ -65,6 +75,7 @@ export interface ServerToClientMessage {
     | 'game_state'
     | 'player_joined'
     | 'player_left'
+    | 'player_ready'
     | 'game_started'
     | 'phase_changed'
     | 'vote_cast'

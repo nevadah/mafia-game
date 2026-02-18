@@ -21,6 +21,18 @@ function createWindow(): void {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function attachClientEvents(c: MafiaClient): void {
+  c.on('state_update', (s) => mainWindow?.webContents.send('mafia:state_update', s));
+  c.on('player_joined', (p) => mainWindow?.webContents.send('mafia:player_joined', p));
+  c.on('player_left', (p) => mainWindow?.webContents.send('mafia:player_left', p));
+  c.on('player_ready', (p) => mainWindow?.webContents.send('mafia:player_ready', p));
+  c.on('vote_cast', (p) => mainWindow?.webContents.send('mafia:vote_cast', p));
+  c.on('player_eliminated', (p) => mainWindow?.webContents.send('mafia:player_eliminated', p));
+  c.on('game_started', (p) => mainWindow?.webContents.send('mafia:game_started', p));
+  c.on('game_ended', (p) => mainWindow?.webContents.send('mafia:game_ended', p));
+  c.on('server_error', (p) => mainWindow?.webContents.send('mafia:server_error', p));
+}
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
@@ -36,28 +48,21 @@ app.on('window-all-closed', () => {
 // ── IPC handlers (renderer → main) ──────────────────────────────────────────
 
 ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName: string) => {
+  client?.disconnect();
   client = new MafiaClient(serverUrl);
+  attachClientEvents(client);
+
   const state = await client.createGame(playerName);
-
-  // Forward real-time events to renderer
-  client.on('state_update', (s) => mainWindow?.webContents.send('mafia:state_update', s));
-  client.on('player_joined', (p) => mainWindow?.webContents.send('mafia:player_joined', p));
-  client.on('player_left', (p) => mainWindow?.webContents.send('mafia:player_left', p));
-  client.on('game_ended', (p) => mainWindow?.webContents.send('mafia:game_ended', p));
-
   await client.connect();
   return { state, playerId: client.playerId, gameId: client.gameId };
 });
 
 ipcMain.handle('mafia:join-game', async (_event, serverUrl: string, gameId: string, playerName: string) => {
+  client?.disconnect();
   client = new MafiaClient(serverUrl);
+  attachClientEvents(client);
+
   const state = await client.joinGame(gameId, playerName);
-
-  client.on('state_update', (s) => mainWindow?.webContents.send('mafia:state_update', s));
-  client.on('player_joined', (p) => mainWindow?.webContents.send('mafia:player_joined', p));
-  client.on('player_left', (p) => mainWindow?.webContents.send('mafia:player_left', p));
-  client.on('game_ended', (p) => mainWindow?.webContents.send('mafia:game_ended', p));
-
   await client.connect();
   return { state, playerId: client.playerId, gameId: client.gameId };
 });
@@ -70,6 +75,48 @@ ipcMain.handle('mafia:get-state', async () => {
 ipcMain.handle('mafia:list-games', async (_event, serverUrl: string) => {
   const c = new MafiaClient(serverUrl);
   return c.listGames();
+});
+
+ipcMain.handle('mafia:mark-ready', async () => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.markReady();
+});
+
+ipcMain.handle('mafia:mark-unready', async () => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.markUnready();
+});
+
+ipcMain.handle('mafia:start-game', async () => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.startGame();
+});
+
+ipcMain.handle('mafia:cast-vote', async (_event, targetId: string) => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.castVote(targetId);
+});
+
+ipcMain.handle('mafia:night-action', async (_event, targetId: string) => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.submitNightAction(targetId);
+});
+
+ipcMain.handle('mafia:resolve-votes', async (_event, force?: boolean) => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.resolveVotes(Boolean(force));
+});
+
+ipcMain.handle('mafia:resolve-night', async (_event, force?: boolean) => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.resolveNight(Boolean(force));
+});
+
+ipcMain.handle('mafia:leave-game', async () => {
+  if (!client) throw new Error('Not connected to a game');
+  const result = await client.leaveGame();
+  client = null;
+  return result;
 });
 
 ipcMain.handle('mafia:disconnect', () => {
