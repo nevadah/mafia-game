@@ -4,3 +4,5 @@ coverage/
 *.js.map
 mafia-test-server-port.txt
 mafia-test-server-pid.txt
+.claude/
+**/.claude/
