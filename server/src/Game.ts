@@ -447,13 +447,14 @@ export class Game {
   }
 
   toState(forPlayerId?: string): GameState {
+    const requestingPlayer = forPlayerId ? this.players.get(forPlayerId) : undefined;
+    const requestorIsMafia = requestingPlayer?.role === 'mafia';
+
     const players = this.getPlayers().map(p => {
-      if (
-        forPlayerId &&
-        (p.id === forPlayerId || this.status === 'ended')
-      ) {
-        return p.toData();
-      }
+      if (!forPlayerId) return p.toPublicData();
+      if (p.id === forPlayerId) return p.toData();
+      if (this.status === 'ended') return p.toData();
+      if (requestorIsMafia && p.role === 'mafia') return p.toData();
       return p.toPublicData();
     });
 

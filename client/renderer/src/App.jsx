@@ -446,6 +446,7 @@ export default function App() {
                       <div className="badges">
                         {isMe      && <span className="badge you">{t('youBadge')}</span>}
                         {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
+                        {!isMe && player.role && <span className="badge role-mafia">{player.role}</span>}
                         {voteCount > 0 && (
                           <span className="badge vote-count">
                             {t('voteCount', { count: voteCount })}
@@ -584,6 +585,7 @@ export default function App() {
                         <div className="player-name">{player.name}</div>
                         <div className="badges">
                           {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
+                          {player.role && <span className="badge role-mafia">{player.role}</span>}
                         </div>
                         <button
                           className="vote-btn"
@@ -617,6 +619,7 @@ export default function App() {
                     <div className="badges">
                       {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
                       {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
+                      {player.id !== currentPlayerId && player.role && <span className="badge role-mafia">{player.role}</span>}
                     </div>
                   </div>
                 ))}
