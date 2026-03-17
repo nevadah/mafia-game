@@ -55,6 +55,40 @@ body {
   margin-bottom: 1rem;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lang-switcher {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.lang-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  letter-spacing: 0.04em;
+}
+
+.lang-btn:hover:not(:disabled) {
+  filter: none;
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.lang-btn.active {
+  background: var(--color-surface-deep);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
 h1 { color: var(--color-accent); }
 
 .card {
