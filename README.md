@@ -51,6 +51,14 @@ npm run dev:renderer --workspace=client
 npm run dev:electron --workspace=client
 ```
 
+Run multiple client instances (for local multiplayer testing):
+
+```bash
+npm run dev:multi --workspace=client
+```
+
+Run this in as many terminals as needed. Each instance is an independent Electron window connected to the same server.
+
 Build all workspaces:
 
 ```bash

@@ -30,6 +30,9 @@ npm run dev:client
 npm run dev:renderer --workspace=client
 npm run dev:electron --workspace=client
 
+# Run multiple independent client instances (for local multiplayer testing)
+npm run dev:multi --workspace=client   # repeat in as many terminals as needed
+
 # Tests
 npm run test:server
 npm run test:client

@@ -24,6 +24,12 @@ npm run dev:renderer --workspace=client
 npm run dev:electron --workspace=client
 ```
 
+Multiple client instances (for local multiplayer testing):
+
+```bash
+npm run dev:multi --workspace=client   # run in as many terminals as needed
+```
+
 ## Typical Change Workflow
 
 1. Update server rules in `server/src/Game.ts` or endpoint logic in `server/src/server.ts`.

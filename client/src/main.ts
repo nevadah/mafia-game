@@ -81,7 +81,8 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('server_error', (p) => mainWindow?.webContents.send('mafia:server_error', p));
 }
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const multiInstance = Boolean(process.env.MAFIA_MULTI_INSTANCE);
+const hasSingleInstanceLock = multiInstance || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
