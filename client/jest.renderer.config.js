@@ -14,5 +14,7 @@ module.exports = {
   moduleNameMapper: {
     '\\.(css|less|scss)$': '<rootDir>/renderer/tests/__mocks__/styleMock.js'
   },
+  setupFiles: ['<rootDir>/renderer/tests/setup.js'],
+  transformIgnorePatterns: ['/node_modules/(?!(i18next|react-i18next)/)'],
   testTimeout: 10000
 };

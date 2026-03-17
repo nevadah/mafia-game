@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import './i18n';
 
 function fallbackCopy(text) {
   const temp = document.createElement('textarea');
@@ -28,6 +30,8 @@ function summarizeResult(result) {
 }
 
 export default function App() {
+  const { t, i18n } = useTranslation();
+
   // ── Theme ──────────────────────────────────────────────────────────────────
 
   const [theme, setTheme] = useState(() => {
@@ -147,9 +151,9 @@ export default function App() {
   }
 
   async function handleCreate() {
-    if (!playerName.trim()) { showStatus('Enter a player name', true); return; }
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
     try {
-      showStatus('Creating game...');
+      showStatus(t('statusCreatingGame'));
       const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim());
       onConnected(result);
     } catch (err) {
@@ -158,10 +162,10 @@ export default function App() {
   }
 
   async function handleJoin() {
-    if (!playerName.trim()) { showStatus('Enter a player name', true); return; }
-    if (!gameIdInput.trim()) { showStatus('Enter a game code', true); return; }
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
+    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
     try {
-      showStatus('Joining game...');
+      showStatus(t('statusJoiningGame'));
       const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
       onConnected(result);
     } catch (err) {
@@ -173,7 +177,7 @@ export default function App() {
     try {
       const result = await window.mafia.leaveGame();
       resetGameUi();
-      showStatus(result.deletedGame ? 'Game closed.' : 'You left the game.');
+      showStatus(result.deletedGame ? t('statusGameClosed') : t('statusLeftGame'));
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
     }
@@ -182,9 +186,9 @@ export default function App() {
   async function handleBrowse() {
     try {
       const games = await window.mafia.listGames(serverUrl.trim());
-      if (!games.length) { showStatus('No waiting games found.'); return; }
+      if (!games.length) { showStatus(t('statusNoGames')); return; }
       const summary = games.map((g) => `${g.gameId} (${g.readyCount}/${g.playerCount})`).join(' · ');
-      showStatus(`Waiting games: ${summary}`);
+      showStatus(t('statusWaitingGames', { summary }));
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
     }
@@ -194,27 +198,33 @@ export default function App() {
 
   useEffect(() => {
     window.mafia.onStateUpdate((state) => applyState(state));
-    window.mafia.onPlayerJoined(() => showStatus('A player joined.'));
-    window.mafia.onPlayerLeft(() => showStatus('A player left.'));
+    window.mafia.onPlayerJoined(() => showStatus(t('statusPlayerJoined')));
+    window.mafia.onPlayerLeft(() => showStatus(t('statusPlayerLeft')));
     window.mafia.onPlayerReady((payload) => {
       if (payload && payload.state) applyState(payload.state);
-      showStatus('Ready status updated.');
+      showStatus(t('statusReadyUpdated'));
     });
-    window.mafia.onVoteCast(() => showStatus('Vote cast.'));
-    window.mafia.onPlayerEliminated((payload) => showStatus(`${payload?.playerId || 'A player'} was eliminated.`));
-    window.mafia.onGameStarted(() => showStatus('Game started.'));
-    window.mafia.onGameEnded((payload) => showStatus(`Game over — ${payload?.winner || 'unknown'} wins!`));
-    window.mafia.onServerError((payload) => showStatus(`Server error: ${payload?.message || 'unknown'}`, true));
+    window.mafia.onVoteCast(() => showStatus(t('statusVoteCast')));
+    window.mafia.onPlayerEliminated((payload) =>
+      showStatus(t('statusPlayerEliminated', { name: payload?.playerId || 'A player' }))
+    );
+    window.mafia.onGameStarted(() => showStatus(t('statusGameStarted')));
+    window.mafia.onGameEnded((payload) =>
+      showStatus(t('statusGameEnded', { winner: payload?.winner || 'unknown' }))
+    );
+    window.mafia.onServerError((payload) =>
+      showStatus(t('statusServerError', { message: payload?.message || 'unknown' }), true)
+    );
     window.mafia.onDeepLink((payload) => {
       if (currentStateRef.current) {
-        showStatus('Join link received — leave your current game first.', true);
+        showStatus(t('statusJoinLinkBlocked'), true);
         return;
       }
       if (payload?.serverUrl) setServerUrl(payload.serverUrl);
       if (payload?.gameId) {
         setGameIdInput(payload.gameId);
         setJoinMode(true);
-        showStatus(`Join link loaded for game ${payload.gameId}.`);
+        showStatus(t('statusJoinLinkLoaded', { gameId: payload.gameId }));
       }
     });
   }, []);
@@ -231,15 +241,31 @@ export default function App() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="app-header">
         <h1>Mafia</h1>
-        <button className="theme-toggle" onClick={toggleTheme}>
-          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-        </button>
+        <div className="header-controls">
+          <div className="lang-switcher">
+            {['en', 'de', 'es', 'fr'].map((lang) => (
+              <button
+                key={lang}
+                className={`lang-btn${i18n.language === lang ? ' active' : ''}`}
+                onClick={() => {
+                  i18n.changeLanguage(lang);
+                  localStorage.setItem('mafia-language', lang);
+                }}
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button className="theme-toggle" onClick={toggleTheme}>
+            {theme === 'dark' ? t('lightMode') : t('darkMode')}
+          </button>
+        </div>
       </div>
 
       {/* ── Entry screen ───────────────────────────────────────────────────── */}
       {!currentState && (
         <div className="entry-screen">
-          <p className="entry-subtitle">A social deduction game</p>
+          <p className="entry-subtitle">{t('entrySubtitle')}</p>
 
           <div className="card entry-card">
             <div className="mode-tabs">
@@ -247,22 +273,22 @@ export default function App() {
                 className={`mode-tab${!joinMode ? ' active' : ''}`}
                 onClick={() => setJoinMode(false)}
               >
-                New Game
+                {t('newGame')}
               </button>
               <button
                 className={`mode-tab${joinMode ? ' active' : ''}`}
                 onClick={() => setJoinMode(true)}
               >
-                Join Game
+                {t('joinGame')}
               </button>
             </div>
 
             <div className="field">
-              <label>Your Name</label>
+              <label>{t('yourName')}</label>
               <input
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Enter your name"
+                placeholder={t('namePlaceholder')}
                 onKeyDown={(e) => e.key === 'Enter' && (joinMode ? handleJoin() : handleCreate())}
                 autoFocus
               />
@@ -270,30 +296,30 @@ export default function App() {
 
             {joinMode && (
               <div className="field">
-                <label>Game Code</label>
+                <label>{t('gameCodeLabel')}</label>
                 <input
                   value={gameIdInput}
                   onChange={(e) => setGameIdInput(e.target.value)}
-                  placeholder="Enter game code"
+                  placeholder={t('gameCodePlaceholder')}
                   onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 />
               </div>
             )}
 
             <button className="btn-full" onClick={joinMode ? handleJoin : handleCreate}>
-              {joinMode ? 'Join Game' : 'Create Game'}
+              {joinMode ? t('joinGame') : t('createGame')}
             </button>
 
             {!joinMode && (
               <button className="btn-full btn-secondary" onClick={handleBrowse}>
-                Browse Waiting Games
+                {t('browseGames')}
               </button>
             )}
 
             <details className="advanced-section">
-              <summary>Advanced</summary>
+              <summary>{t('advanced')}</summary>
               <div className="field">
-                <label>Server URL</label>
+                <label>{t('serverUrl')}</label>
                 <input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} />
               </div>
             </details>
@@ -305,54 +331,54 @@ export default function App() {
       {currentState && inLobby && (
         <div className="card stack">
           <div className="lobby-header">
-            <span className="phase">Lobby</span>
+            <span className="phase">{t('lobbyPhase')}</span>
             <span className="lobby-meta">
-              {currentState.players.length} / {currentState.settings.maxPlayers} players
+              {t('lobbyPlayerCount', { current: currentState.players.length, max: currentState.settings.maxPlayers })}
               &nbsp;·&nbsp;
-              {currentState.readyCount} ready
+              {t('readyCount', { count: currentState.readyCount })}
             </span>
           </div>
 
           <div>
-            <label>Game Code</label>
+            <label>{t('gameCodeLabel')}</label>
             <div className="game-code-box">
               <span className="game-code-value">{currentState.id}</span>
               <div className="game-code-actions">
                 <button
                   className="copy-btn"
                   onClick={async () => {
-                    try { await copyText(currentState.id); showStatus('Game code copied.'); }
-                    catch { showStatus(`Copy failed. Code: ${currentState.id}`, true); }
+                    try { await copyText(currentState.id); showStatus(t('statusCodeCopied')); }
+                    catch { showStatus(t('statusCopyFailed', { code: currentState.id }), true); }
                   }}
                 >
-                  Copy Code
+                  {t('copyCode')}
                 </button>
                 <button
                   className="copy-link-btn"
                   onClick={async () => {
                     const link = buildJoinDeepLink();
-                    if (!link) { showStatus('No join link available.', true); return; }
-                    try { await copyText(link); showStatus('Invite link copied.'); }
-                    catch { showStatus(`Copy failed. Link: ${link}`, true); }
+                    if (!link) { showStatus(t('statusNoJoinLink'), true); return; }
+                    try { await copyText(link); showStatus(t('statusInviteCopied')); }
+                    catch { showStatus(t('statusInviteFailed', { link }), true); }
                   }}
                 >
-                  Copy Invite Link
+                  {t('copyInviteLink')}
                 </button>
               </div>
             </div>
           </div>
 
           <div>
-            <label>Players</label>
+            <label>{t('playersLabel')}</label>
             <div className="players">
               {currentState.players.map((player) => (
                 <div key={player.id} className="player">
                   <div className="player-name">{player.name}</div>
                   <div className="badges">
-                    {player.id === currentPlayerId && <span className="badge you">You</span>}
-                    {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                    {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
+                    {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
                     <span className={`badge ${player.isReady ? 'ready' : 'not-ready'}`}>
-                      {player.isReady ? 'Ready' : 'Not Ready'}
+                      {player.isReady ? t('readyBadge') : t('notReadyBadge')}
                     </span>
                   </div>
                 </div>
@@ -362,22 +388,22 @@ export default function App() {
 
           <div className="lobby-actions">
             {!me?.isReady
-              ? <button onClick={() => runAction('Marking ready', window.mafia.markReady)}>Ready</button>
-              : <button onClick={() => runAction('Marking unready', window.mafia.markUnready)}>Unready</button>
+              ? <button onClick={() => runAction(t('actionMarkingReady'), window.mafia.markReady)}>{t('readyButton')}</button>
+              : <button onClick={() => runAction(t('actionMarkingUnready'), window.mafia.markUnready)}>{t('unreadyButton')}</button>
             }
             {isHost && (
-              <button disabled={!canStart} onClick={() => runAction('Starting game', window.mafia.startGame)}>
-                Start Game
+              <button disabled={!canStart} onClick={() => runAction(t('actionStartingGame'), window.mafia.startGame)}>
+                {t('startGame')}
               </button>
             )}
-            <button className="btn-secondary" onClick={handleLeave}>Leave</button>
+            <button className="btn-secondary" onClick={handleLeave}>{t('leaveButton')}</button>
           </div>
 
           {isHost && !canStart && (
             <p className="lobby-hint">
               {currentState.players.length < currentState.settings.minPlayers
-                ? `Need at least ${currentState.settings.minPlayers} players to start.`
-                : 'Waiting for all players to ready up.'}
+                ? t('needMorePlayers', { count: currentState.settings.minPlayers })
+                : t('waitingForReady')}
             </p>
           )}
         </div>
@@ -396,18 +422,18 @@ export default function App() {
           <>
             <div className="card stack">
               <div className="day-header">
-                <span className="phase">Day {currentState.round}</span>
-                <span className="phase-meta">Discuss and vote to eliminate a suspect</span>
+                <span className="phase">{t('dayPhase', { round: currentState.round })}</span>
+                <span className="phase-meta">{t('dayMeta')}</span>
               </div>
               <p className="meta">
-                Playing as <strong>{me?.name}</strong>
-                {me?.role && <> · Role: <strong>{me.role}</strong></>}
-                {isHost && ' · Host'}
+                {t('playingAs')} <strong>{me?.name}</strong>
+                {me?.role && <> · {t('roleLabel')}: <strong>{me.role}</strong></>}
+                {isHost && ` · ${t('hostBadge')}`}
               </p>
             </div>
 
             <div className="card stack">
-              <div className="section-heading">Cast Your Vote</div>
+              <div className="section-heading">{t('castYourVote')}</div>
               <div className="players">
                 {alivePlayers.map((player) => {
                   const isMe      = player.id === currentPlayerId;
@@ -418,21 +444,21 @@ export default function App() {
                     <div key={player.id} className={`player${iVotedFor ? ' voted-for' : ''}`}>
                       <div className="player-name">{player.name}</div>
                       <div className="badges">
-                        {isMe      && <span className="badge you">You</span>}
-                        {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                        {isMe      && <span className="badge you">{t('youBadge')}</span>}
+                        {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
                         {voteCount > 0 && (
                           <span className="badge vote-count">
-                            {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                            {t('voteCount', { count: voteCount })}
                           </span>
                         )}
-                        {iVotedFor && <span className="badge your-vote">Your vote</span>}
+                        {iVotedFor && <span className="badge your-vote">{t('yourVote')}</span>}
                       </div>
                       {!isMe && me?.isAlive && !myVote && (
                         <button
                           className="vote-btn"
-                          onClick={() => runAction('Casting vote', () => window.mafia.castVote(player.id))}
+                          onClick={() => runAction(t('actionCastingVote'), () => window.mafia.castVote(player.id))}
                         >
-                          Vote
+                          {t('voteButton')}
                         </button>
                       )}
                     </div>
@@ -442,7 +468,7 @@ export default function App() {
 
               {pendingVoters.length > 0 && (
                 <p className="lobby-hint">
-                  Waiting to vote: {pendingVoters.map((p) => p.name).join(', ')}
+                  {t('waitingToVote', { names: pendingVoters.map((p) => p.name).join(', ') })}
                 </p>
               )}
 
@@ -454,10 +480,10 @@ export default function App() {
                       checked={forceResolve}
                       onChange={(e) => setForceResolve(e.target.checked)}
                     />
-                    Force resolve
+                    {t('forceResolve')}
                   </label>
-                  <button onClick={() => runAction('Resolving day', () => window.mafia.resolveVotes(forceResolve))}>
-                    Resolve Day
+                  <button onClick={() => runAction(t('actionResolvingDay'), () => window.mafia.resolveVotes(forceResolve))}>
+                    {t('resolveDay')}
                   </button>
                 </div>
               )}
@@ -465,13 +491,13 @@ export default function App() {
 
             {deadPlayers.length > 0 && (
               <div className="card stack">
-                <div className="section-heading">Eliminated</div>
+                <div className="section-heading">{t('eliminated')}</div>
                 <div className="players">
                   {deadPlayers.map((player) => (
                     <div key={player.id} className="player dead">
                       <div className="player-name">{player.name}</div>
                       <div className="badges">
-                        <span className="badge dead">Eliminated</span>
+                        <span className="badge dead">{t('eliminated')}</span>
                       </div>
                     </div>
                   ))}
@@ -480,7 +506,7 @@ export default function App() {
             )}
 
             <div className="controls">
-              <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
+              <button className="btn-secondary" onClick={handleLeave}>{t('leaveGame')}</button>
             </div>
           </>
         );
@@ -502,7 +528,7 @@ export default function App() {
           return [];
         })();
 
-        const actionLabel = myRole === 'mafia' ? 'Eliminate' : myRole === 'doctor' ? 'Protect' : 'Investigate';
+        const actionLabel = myRole === 'mafia' ? t('eliminateAction') : myRole === 'doctor' ? t('protectAction') : t('investigateAction');
         const investigation = currentState.investigatedThisRound;
         const investigatedPlayer = investigation
           ? currentState.players.find((p) => p.id === investigation.target)
@@ -514,28 +540,29 @@ export default function App() {
           <>
             <div className="card stack">
               <div className="day-header">
-                <span className="phase">Night {nightNumber}</span>
+                <span className="phase">{t('nightPhase', { number: nightNumber })}</span>
                 <span className="phase-meta">
-                  {myRole === 'mafia'   && 'Choose a target to eliminate.'}
-                  {myRole === 'doctor'  && 'Choose a player to protect.'}
-                  {myRole === 'sheriff' && 'Choose a player to investigate.'}
-                  {(!myRole || myRole === 'townsperson') && 'The town sleeps…'}
+                  {myRole === 'mafia'   && t('nightMafiaMeta')}
+                  {myRole === 'doctor'  && t('nightDoctorMeta')}
+                  {myRole === 'sheriff' && t('nightSheriffMeta')}
+                  {(!myRole || myRole === 'townsperson') && t('nightTownMeta')}
                 </span>
               </div>
               <p className="meta">
-                Playing as <strong>{me?.name}</strong>
-                {myRole && <> · Role: <strong>{myRole}</strong></>}
-                {isHost && ' · Host'}
+                {t('playingAs')} <strong>{me?.name}</strong>
+                {myRole && <> · {t('roleLabel')}: <strong>{myRole}</strong></>}
+                {isHost && ` · ${t('hostBadge')}`}
               </p>
             </div>
 
             {myRole === 'sheriff' && investigatedPlayer && (
               <div className="card stack">
-                <div className="section-heading">Previous Investigation</div>
+                <div className="section-heading">{t('prevInvestigation')}</div>
                 <p className="meta">
-                  <strong>{investigatedPlayer.name}</strong> is{' '}
+                  <strong>{investigatedPlayer.name}</strong>{' '}
+                  {t('investigationIs')}{' '}
                   <strong className={investigation.result === 'mafia' ? 'role-mafia' : 'role-town'}>
-                    {investigation.result === 'mafia' ? 'Mafia' : 'not Mafia'}
+                    {t(investigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')}
                   </strong>.
                 </p>
               </div>
@@ -544,19 +571,19 @@ export default function App() {
             {nightTargets.length > 0 && (
               <div className="card stack">
                 <div className="section-heading">
-                  {myRole === 'mafia'   && 'Select a target to eliminate'}
-                  {myRole === 'doctor'  && 'Select a player to protect'}
-                  {myRole === 'sheriff' && 'Select a player to investigate'}
+                  {myRole === 'mafia'   && t('selectEliminate')}
+                  {myRole === 'doctor'  && t('selectProtect')}
+                  {myRole === 'sheriff' && t('selectInvestigate')}
                 </div>
                 {hasSubmitted ? (
-                  <p className="lobby-hint">Action submitted. Waiting for night to resolve…</p>
+                  <p className="lobby-hint">{t('actionSubmitted')}</p>
                 ) : (
                   <div className="players">
                     {nightTargets.map((player) => (
                       <div key={player.id} className="player">
                         <div className="player-name">{player.name}</div>
                         <div className="badges">
-                          {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                          {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
                         </div>
                         <button
                           className="vote-btn"
@@ -577,19 +604,19 @@ export default function App() {
 
             {myRole === 'townsperson' && me?.isAlive && (
               <div className="card stack">
-                <p className="lobby-hint">The night phase is underway. Await the results at dawn.</p>
+                <p className="lobby-hint">{t('townSleepsHint')}</p>
               </div>
             )}
 
             <div className="card stack">
-              <div className="section-heading">Players</div>
+              <div className="section-heading">{t('playersLabel')}</div>
               <div className="players">
                 {currentState.players.filter((p) => p.isAlive).map((player) => (
                   <div key={player.id} className="player">
                     <div className="player-name">{player.name}</div>
                     <div className="badges">
-                      {player.id === currentPlayerId && <span className="badge you">You</span>}
-                      {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                      {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
+                      {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
                     </div>
                   </div>
                 ))}
@@ -598,13 +625,13 @@ export default function App() {
 
             {deadPlayers.length > 0 && (
               <div className="card stack">
-                <div className="section-heading">Eliminated</div>
+                <div className="section-heading">{t('eliminated')}</div>
                 <div className="players">
                   {deadPlayers.map((player) => (
                     <div key={player.id} className="player dead">
                       <div className="player-name">{player.name}</div>
                       <div className="badges">
-                        <span className="badge dead">Eliminated</span>
+                        <span className="badge dead">{t('eliminated')}</span>
                       </div>
                     </div>
                   ))}
@@ -621,45 +648,45 @@ export default function App() {
                       checked={forceResolve}
                       onChange={(e) => setForceResolve(e.target.checked)}
                     />
-                    Force resolve
+                    {t('forceResolve')}
                   </label>
-                  <button onClick={() => runAction('Resolving night', () => window.mafia.resolveNight(forceResolve))}>
-                    Resolve Night
+                  <button onClick={() => runAction(t('actionResolvingNight'), () => window.mafia.resolveNight(forceResolve))}>
+                    {t('resolveNight')}
                   </button>
                 </div>
               </div>
             )}
 
             <div className="controls">
-              <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
+              <button className="btn-secondary" onClick={handleLeave}>{t('leaveGame')}</button>
             </div>
           </>
         );
       })()}
 
-      {/* ── Game over (placeholder — full UI coming in next PR) ─────────────── */}
+      {/* ── Game over ──────────────────────────────────────────────────────── */}
       {currentState && isEnded && (
         <>
           <div className="card stack">
             <div className="day-header">
-              <span className="phase">Game Over</span>
+              <span className="phase">{t('gameOver')}</span>
               <span className="phase-meta">
-                {currentState.winner === 'town' ? 'Town wins!' : 'Mafia wins!'}
+                {currentState.winner === 'town' ? t('townWins') : t('mafiaWins')}
               </span>
             </div>
           </div>
 
           <div className="card stack">
-            <div className="section-heading">Final Standings</div>
+            <div className="section-heading">{t('finalStandings')}</div>
             <div className="players">
               {currentState.players.map((player) => (
                 <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
                   <div className="player-name">{player.name}</div>
                   <div className="badges">
-                    {player.id === currentPlayerId && <span className="badge you">You</span>}
+                    {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
                     {player.role && <span className="badge">{player.role}</span>}
                     <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
-                      {player.isAlive ? 'Survived' : 'Eliminated'}
+                      {player.isAlive ? t('survivedBadge') : t('eliminated')}
                     </span>
                   </div>
                 </div>
@@ -668,7 +695,7 @@ export default function App() {
           </div>
 
           <div className="controls">
-            <button onClick={resetGameUi}>Back to Menu</button>
+            <button onClick={resetGameUi}>{t('backToMenu')}</button>
           </div>
         </>
       )}
