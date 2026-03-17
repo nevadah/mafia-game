@@ -500,6 +500,68 @@ describe('Game', () => {
       expect(state.investigatedThisRound?.result).toBe('mafia');
     });
 
+    it('investigatedThisRound is null for non-sheriff requestors', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const sheriff = players.find(p => p.role === 'sheriff')!;
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(sheriff.id, mafia.id);
+      game.resolveNightActions();
+      expect(game.toState(town.id).investigatedThisRound).toBeNull();
+      expect(game.toState(mafia.id).investigatedThisRound).toBeNull();
+      expect(game.toState().investigatedThisRound).toBeNull();
+    });
+
+    it('doctorProtectedThisRound is visible to doctor', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const doctor = players.find(p => p.role === 'doctor')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(doctor.id, town.id);
+      game.resolveNightActions();
+      const state = game.toState(doctor.id);
+      expect(state.doctorProtectedThisRound).toBe(town.id);
+    });
+
+    it('doctorProtectedThisRound is null for non-doctor requestors', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const doctor = players.find(p => p.role === 'doctor')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      const mafia = players.find(p => p.role === 'mafia')!;
+      game.submitNightAction(doctor.id, town.id);
+      game.resolveNightActions();
+      expect(game.toState(town.id).doctorProtectedThisRound).toBeNull();
+      expect(game.toState(mafia.id).doctorProtectedThisRound).toBeNull();
+      expect(game.toState().doctorProtectedThisRound).toBeNull();
+    });
+
+    it('eliminatedThisRound persists into the day phase after night resolution', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(mafia.id, town.id);
+      game.resolveNightActions();
+      game.advancePhase(); // night → day
+      expect(game.toState().eliminatedThisRound).toBe(town.id);
+    });
+
+    it('eliminatedThisRound is cleared at the start of the next resolveNightActions', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(mafia.id, town.id);
+      game.resolveNightActions();
+      game.advancePhase(); // night → day
+      game.advancePhase(); // day → night
+      // No mafia kill this time
+      game.resolveNightActions();
+      expect(game.toState().eliminatedThisRound).toBeUndefined();
+    });
+
     it('throws when not in night phase', () => {
       const { game } = makeGame(4);
       game.start();

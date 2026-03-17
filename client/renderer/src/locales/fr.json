@@ -96,6 +96,13 @@
   "statusInviteFailed": "Échec de la copie. Lien : {{link}}",
   "statusNoJoinLink": "Aucun lien de connexion disponible.",
 
+  "nightSummaryTitle": "Résultats de la Nuit {{round}}",
+  "nightSummaryNoKill": "Personne n'a été éliminé cette nuit.",
+  "nightSummaryEliminated": "{{name}} a été éliminé par la Mafia.",
+  "nightSummaryDoctorProtected": "Vous avez protégé {{name}}.",
+  "nightSummaryInvestigated": "Vous avez enquêté sur {{name}}. Ils sont {{result}}.",
+  "nightSummaryDismiss": "Compris",
+
   "actionMarkingReady": "Marquer prêt",
   "actionMarkingUnready": "Marquer pas prêt",
   "actionStartingGame": "Démarrage",

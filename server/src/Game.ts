@@ -27,7 +27,7 @@ export class Game {
   private votes: Map<string, string>;
   private nightActions: Map<string, string>;
   private eliminatedThisRound?: string;
-  private savedThisRound?: string;
+  private doctorProtectedThisRound?: string;
   private investigatedThisRound?: { target: string; result: Role } | null;
   readonly settings: GameSettings;
   private readonly createdAt: number;
@@ -244,6 +244,8 @@ export class Game {
       throw new Error('Can only resolve votes during day phase');
     }
 
+    this.eliminatedThisRound = undefined;
+
     const voteCounts = new Map<string, number>();
     for (const targetId of this.votes.values()) {
       voteCounts.set(targetId, (voteCounts.get(targetId) ?? 0) + 1);
@@ -342,7 +344,8 @@ export class Game {
       }
     }
 
-    this.savedThisRound = undefined;
+    this.eliminatedThisRound = undefined;
+    this.doctorProtectedThisRound = undefined;
     this.investigatedThisRound = null;
 
     if (sheriffTarget && sheriffActor) {
@@ -376,7 +379,7 @@ export class Game {
     let eliminated: string | null = null;
     if (mafiaTarget) {
       if (mafiaTarget === doctorTarget) {
-        this.savedThisRound = mafiaTarget;
+        // doctor blocked the kill — no elimination
       } else {
         const target = this.players.get(mafiaTarget);
         if (target && target.isAlive) {
@@ -386,6 +389,8 @@ export class Game {
         }
       }
     }
+
+    this.doctorProtectedThisRound = doctorTarget;
 
     this.nightActions.clear();
     this.touch();
@@ -398,7 +403,6 @@ export class Game {
     if (this.status !== 'active') {
       throw new Error('Game is not active');
     }
-    this.eliminatedThisRound = undefined;
 
     if (this.phase === 'day') {
       this.phase = 'night';
@@ -469,8 +473,12 @@ export class Game {
       votes: this.getVotes(),
       nightActions: {},
       eliminatedThisRound: this.eliminatedThisRound,
-      savedThisRound: this.savedThisRound,
-      investigatedThisRound: this.investigatedThisRound,
+      doctorProtectedThisRound: requestingPlayer?.role === 'doctor'
+        ? (this.doctorProtectedThisRound ?? null)
+        : null,
+      investigatedThisRound: requestingPlayer?.role === 'sheriff'
+        ? (this.investigatedThisRound ?? null)
+        : null,
       settings: this.settings,
       readyCount: this.getReadyCount()
     };

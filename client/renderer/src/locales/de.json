@@ -96,6 +96,13 @@
   "statusInviteFailed": "Kopieren fehlgeschlagen. Link: {{link}}",
   "statusNoJoinLink": "Kein Beitrittslink verfügbar.",
 
+  "nightSummaryTitle": "Nacht {{round}} Ergebnisse",
+  "nightSummaryNoKill": "Heute Nacht wurde niemand eliminiert.",
+  "nightSummaryEliminated": "{{name}} wurde von der Mafia eliminiert.",
+  "nightSummaryDoctorProtected": "Du hast {{name}} beschützt.",
+  "nightSummaryInvestigated": "Du hast {{name}} untersucht. Sie sind {{result}}.",
+  "nightSummaryDismiss": "Verstanden",
+
   "actionMarkingReady": "Bereit markieren",
   "actionMarkingUnready": "Nicht bereit markieren",
   "actionStartingGame": "Starte Spiel",
