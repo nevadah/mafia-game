@@ -268,6 +268,56 @@ describe('App — day phase eliminated players', () => {
   });
 });
 
+// ── Sheriff investigation result (day phase) ─────────────────────────────────
+
+describe('App — day phase sheriff investigation result', () => {
+  it('shows investigation result for sheriff when investigatedThisRound is set', async () => {
+    const user = userEvent.setup();
+    const state = makeDayState({
+      players: [
+        { id: 'p1', name: 'Alice', role: 'sheriff', isAlive: true, isReady: true, isConnected: true },
+        { id: 'p2', name: 'Bob',   role: undefined,  isAlive: true, isReady: true, isConnected: true },
+        { id: 'p3', name: 'Carol', role: undefined,  isAlive: true, isReady: true, isConnected: true }
+      ],
+      investigatedThisRound: { target: 'p2', result: 'mafia' }
+    });
+    await enterDayPhase(user, state);
+    const card = screen.getByText(/Previous Investigation/i).closest('.card');
+    expect(within(card).getByText(/Bob/)).toBeInTheDocument();
+    expect(within(card).getByText(/Mafia/)).toBeInTheDocument();
+  });
+
+  it('shows "not Mafia" result correctly in day phase', async () => {
+    const user = userEvent.setup();
+    const state = makeDayState({
+      players: [
+        { id: 'p1', name: 'Alice', role: 'sheriff', isAlive: true, isReady: true, isConnected: true },
+        { id: 'p2', name: 'Bob',   role: undefined,  isAlive: true, isReady: true, isConnected: true },
+        { id: 'p3', name: 'Carol', role: undefined,  isAlive: true, isReady: true, isConnected: true }
+      ],
+      investigatedThisRound: { target: 'p3', result: 'townsperson' }
+    });
+    await enterDayPhase(user, state);
+    expect(screen.getByText(/not Mafia/i)).toBeInTheDocument();
+  });
+
+  it('does not show investigation card when investigatedThisRound is null', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState({ investigatedThisRound: null }));
+    expect(screen.queryByText(/Previous Investigation/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show investigation card for non-sheriff players', async () => {
+    const user = userEvent.setup();
+    const state = makeDayState({
+      investigatedThisRound: { target: 'p2', result: 'mafia' }
+    });
+    // p1 is 'townsperson' in makeDayState
+    await enterDayPhase(user, state);
+    expect(screen.queryByText(/Previous Investigation/i)).not.toBeInTheDocument();
+  });
+});
+
 // ── State update ──────────────────────────────────────────────────────────────
 
 describe('App — day phase state updates', () => {
