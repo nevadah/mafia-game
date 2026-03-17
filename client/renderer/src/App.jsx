@@ -96,6 +96,7 @@ export default function App() {
   const inLobby  = Boolean(currentState && currentState.phase === 'lobby' && currentState.status === 'waiting');
   const inDay    = Boolean(currentState && currentState.phase === 'day'   && currentState.status === 'active');
   const inNight  = Boolean(currentState && currentState.phase === 'night' && currentState.status === 'active');
+  const isEnded  = Boolean(currentState && currentState.status === 'ended');
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -380,114 +381,185 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Active game ────────────────────────────────────────────────────── */}
-      {currentState && !inLobby && (
-        <>
-          <div className="card stack">
-            <div>
-              <div className="phase">Phase: {currentState.phase}</div>
+      {/* ── Day phase ──────────────────────────────────────────────────────── */}
+      {currentState && inDay && (() => {
+        const myVote = currentState.votes[currentPlayerId];
+        const pendingVoters = currentState.players.filter(
+          (p) => p.isAlive && !currentState.votes[p.id]
+        );
+        const alivePlayers = currentState.players.filter((p) => p.isAlive);
+        const deadPlayers  = currentState.players.filter((p) => !p.isAlive);
+
+        return (
+          <>
+            <div className="card stack">
+              <div className="day-header">
+                <span className="phase">Day {currentState.round}</span>
+                <span className="phase-meta">Discuss and vote to eliminate a suspect</span>
+              </div>
               <p className="meta">
-                Round {currentState.round} · Status: {currentState.status}
-              </p>
-              <p className="meta">
-                You: {currentPlayerId || '-'} · Role: {me?.role || 'hidden'} {isHost ? '· Host' : ''}
+                Playing as <strong>{me?.name}</strong>
+                {me?.role && <> · Role: <strong>{me.role}</strong></>}
+                {isHost && ' · Host'}
               </p>
             </div>
 
-            <div>
-              <label>Players</label>
+            <div className="card stack">
+              <div className="section-heading">Cast Your Vote</div>
               <div className="players">
-                {currentState.players.map((player) => (
-                  <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
-                    <div className="player-name">{player.name}</div>
-                    <div className="badges">
-                      {player.id === currentPlayerId && <span className="badge you">You</span>}
-                      {player.id === currentState.hostId && <span className="badge host">Host</span>}
-                      <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
-                        {player.isAlive ? 'Alive' : 'Dead'}
-                      </span>
-                      {player.role && <span className="badge">{player.role}</span>}
+                {alivePlayers.map((player) => {
+                  const isMe      = player.id === currentPlayerId;
+                  const voteCount = Object.values(currentState.votes).filter((t) => t === player.id).length;
+                  const iVotedFor = myVote === player.id;
+
+                  return (
+                    <div key={player.id} className={`player${iVotedFor ? ' voted-for' : ''}`}>
+                      <div className="player-name">{player.name}</div>
+                      <div className="badges">
+                        {isMe      && <span className="badge you">You</span>}
+                        {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                        {voteCount > 0 && (
+                          <span className="badge vote-count">
+                            {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+                          </span>
+                        )}
+                        {iVotedFor && <span className="badge your-vote">Your vote</span>}
+                      </div>
+                      {!isMe && me?.isAlive && !myVote && (
+                        <button
+                          className="vote-btn"
+                          onClick={() => runAction('Casting vote', () => window.mafia.castVote(player.id))}
+                        >
+                          Vote
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {pendingVoters.length > 0 && (
+                <p className="lobby-hint">
+                  Waiting to vote: {pendingVoters.map((p) => p.name).join(', ')}
+                </p>
+              )}
+
+              {isHost && (
+                <div className="day-controls">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={forceResolve}
+                      onChange={(e) => setForceResolve(e.target.checked)}
+                    />
+                    Force resolve
+                  </label>
+                  <button onClick={() => runAction('Resolving day', () => window.mafia.resolveVotes(forceResolve))}>
+                    Resolve Day
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="row">
-              <div>
-                <label>Target</label>
-                <select
-                  value={targetId}
-                  onChange={(e) => setTargetId(e.target.value)}
-                  disabled={!targetCandidates.length}
-                >
-                  {!targetCandidates.length && <option value="">No valid targets</option>}
-                  {targetCandidates.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+            {deadPlayers.length > 0 && (
+              <div className="card stack">
+                <div className="section-heading">Eliminated</div>
+                <div className="players">
+                  {deadPlayers.map((player) => (
+                    <div key={player.id} className="player dead">
+                      <div className="player-name">{player.name}</div>
+                      <div className="badges">
+                        <span className="badge dead">Eliminated</span>
+                      </div>
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={forceResolve}
-                    onChange={(e) => setForceResolve(e.target.checked)}
-                  />
-                  Force resolve (host)
-                </label>
-              </div>
-            </div>
+            )}
 
             <div className="controls">
-              <button
-                disabled={!inDay || !me || !me.isAlive || !targetCandidates.length}
-                onClick={() => runAction('Casting vote', () => window.mafia.castVote(targetId))}
-              >
-                Vote
-              </button>
-              <button
-                disabled={!inNight || !me || !me.isAlive || !targetCandidates.length}
-                onClick={() => runAction('Submitting night action', () => window.mafia.nightAction(targetId))}
-              >
-                Night Action
-              </button>
-              <button
-                disabled={!inDay || !isHost}
-                onClick={() => runAction('Resolving day', () => window.mafia.resolveVotes(forceResolve))}
-              >
-                Resolve Day
-              </button>
-              <button
-                disabled={!inNight || !isHost}
-                onClick={() => runAction('Resolving night', () => window.mafia.resolveNight(forceResolve))}
-              >
-                Resolve Night
-              </button>
-              <button
-                onClick={async () => {
-                  try { const s = await window.mafia.getState(); applyState(s); showStatus('State refreshed.'); }
-                  catch (err) { showStatus(`Error: ${err.message}`, true); }
-                }}
-              >
-                Refresh
-              </button>
-              <button onClick={handleLeave}>Leave Game</button>
-              <button
-                onClick={async () => {
-                  await window.mafia.disconnect();
-                  resetGameUi();
-                  showStatus('Disconnected.');
-                }}
-              >
-                Disconnect
-              </button>
+              <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ── Night phase (placeholder — full UI coming in next PR) ───────────── */}
+      {currentState && inNight && (
+        <>
+          <div className="card stack">
+            <div className="day-header">
+              <span className="phase">Night {currentState.round}</span>
+              <span className="phase-meta">
+                {me?.role === 'mafia'    && 'Choose a target to eliminate.'}
+                {me?.role === 'doctor'   && 'Choose a player to protect.'}
+                {me?.role === 'sheriff'  && 'Choose a player to investigate.'}
+                {(!me?.role || me.role === 'townsperson') && 'Wait for night to resolve…'}
+              </span>
+            </div>
+            <p className="meta">
+              Playing as <strong>{me?.name}</strong>
+              {me?.role && <> · Role: <strong>{me.role}</strong></>}
+              {isHost && ' · Host'}
+            </p>
+          </div>
+
+          <div className="card stack">
+            <div className="section-heading">Players</div>
+            <div className="players">
+              {currentState.players.map((player) => (
+                <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
+                  <div className="player-name">{player.name}</div>
+                  <div className="badges">
+                    {player.id === currentPlayerId && <span className="badge you">You</span>}
+                    {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                    <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
+                      {player.isAlive ? 'Alive' : 'Eliminated'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="card">
-            <strong>Raw Game State</strong>
-            <pre className="state-view">{JSON.stringify(currentState, null, 2)}</pre>
+          <div className="controls">
+            <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
+          </div>
+        </>
+      )}
+
+      {/* ── Game over (placeholder — full UI coming in next PR) ─────────────── */}
+      {currentState && isEnded && (
+        <>
+          <div className="card stack">
+            <div className="day-header">
+              <span className="phase">Game Over</span>
+              <span className="phase-meta">
+                {currentState.winner === 'town' ? 'Town wins!' : 'Mafia wins!'}
+              </span>
+            </div>
+          </div>
+
+          <div className="card stack">
+            <div className="section-heading">Final Standings</div>
+            <div className="players">
+              {currentState.players.map((player) => (
+                <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
+                  <div className="player-name">{player.name}</div>
+                  <div className="badges">
+                    {player.id === currentPlayerId && <span className="badge you">You</span>}
+                    {player.role && <span className="badge">{player.role}</span>}
+                    <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
+                      {player.isAlive ? 'Survived' : 'Eliminated'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="controls">
+            <button onClick={resetGameUi}>Back to Menu</button>
           </div>
         </>
       )}
