@@ -17,7 +17,7 @@ It serves two purposes: building a functional multiplayer implementation of Mafi
 
 ## Current Status
 
-Active work in progress. The core game loop — lobby, day voting, night actions, and win conditions — is fully implemented and tested. A basic Electron + React UI exists. Not yet implemented: game persistence, production deployment, and a polished UI.
+Active work in progress. The core game loop — lobby, day voting, night actions, and win conditions — is fully implemented and tested. The Electron + React UI is functional and includes light/dark themes and a runtime language switcher (English, German, Spanish, French). Not yet implemented: game persistence, production deployment, and a polished UI.
 
 ## Quick Start
 
@@ -51,6 +51,12 @@ npm run dev:renderer --workspace=client
 npm run dev:electron --workspace=client
 ```
 
+Start the server and renderer dev server together (then launch clients in separate terminals):
+
+```bash
+npm run dev:backend
+```
+
 Run multiple client instances (for local multiplayer testing):
 
 ```bash
@@ -58,6 +64,13 @@ npm run dev:multi --workspace=client
 ```
 
 Run this in as many terminals as needed. Each instance is an independent Electron window connected to the same server.
+
+Run a headless end-to-end game simulation (useful for smoke-testing the full client ↔ server contract):
+
+```bash
+npm run simulate          # 4 players (default)
+npm run simulate -- 6     # 6 players
+```
 
 Build all workspaces:
 

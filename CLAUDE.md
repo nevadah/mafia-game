@@ -30,13 +30,21 @@ npm run dev:client
 npm run dev:renderer --workspace=client
 npm run dev:electron --workspace=client
 
+# Start server + Vite renderer dev server together (recommended before launching clients)
+npm run dev:backend
+
 # Run multiple independent client instances (for local multiplayer testing)
 npm run dev:multi --workspace=client   # repeat in as many terminals as needed
+
+# Headless end-to-end simulation (no UI required)
+npm run simulate              # 4 players (default)
+npm run simulate -- 6         # N players
 
 # Tests
 npm run test:server
 npm run test:client
 npm run test                  # both
+npm run test:renderer --workspace=client  # renderer component tests only
 ```
 
 ## Architecture
@@ -57,6 +65,9 @@ npm run test                  # both
 | `client/src/main.ts` | Electron main process, IPC handlers, deep-link parsing |
 | `client/src/preload.ts` | `window.mafia` API exposed securely to renderer |
 | `client/renderer/src/App.jsx` | React UI for all game phases |
+| `client/renderer/src/i18n.ts` | i18next initialization; reads saved language from localStorage |
+| `client/renderer/src/locales/` | Locale JSON files (en, de, es, fr) — add new UI strings here |
+| `client/scripts/simulate-game.ts` | Headless game simulation (spawns server, drives N clients) |
 
 ### Authentication
 
@@ -86,7 +97,8 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 3. Client SDK → `client/src/MafiaClient.ts`
 4. IPC bridge (if needed) → `client/src/main.ts`, `client/src/preload.ts`
 5. UI → `client/renderer/src/App.jsx`
-6. Add/update tests in the corresponding workspace `tests/` folder.
+6. New UI strings → add key + English value to `client/renderer/src/locales/en.json`, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
+7. Add/update tests in the corresponding workspace `tests/` folder.
 
 Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC bridge, and renderer call sites.
 
