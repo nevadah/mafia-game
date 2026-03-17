@@ -584,13 +584,40 @@ describe('Game', () => {
       expect(playerData?.role).toBeDefined();
     });
 
-    it('hides roles of other players', () => {
+    it('hides roles of other players for non-mafia requestors', () => {
       const { game, players } = makeGame(4);
       game.start();
-      const p = players[0];
-      const state = game.toState(p.id);
-      const otherPlayerData = state.players.find(pd => pd.id !== p.id);
-      expect(otherPlayerData?.role).toBeUndefined();
+      const nonMafia = players.find(p => p.role !== 'mafia')!;
+      const state = game.toState(nonMafia.id);
+      const otherPlayers = state.players.filter(pd => pd.id !== nonMafia.id);
+      for (const pd of otherPlayers) {
+        expect(pd.role).toBeUndefined();
+      }
+    });
+
+    it('reveals fellow mafia roles to a mafia requestor', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const mafia = players.filter(p => p.role === 'mafia');
+      // Only meaningful when there are at least 2 mafia members
+      if (mafia.length < 2) return;
+      const [requester, teammate] = mafia;
+      const state = game.toState(requester.id);
+      const teammateData = state.players.find(pd => pd.id === teammate.id);
+      expect(teammateData?.role).toBe('mafia');
+    });
+
+    it('does not reveal non-mafia roles to a mafia requestor', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const state = game.toState(mafia.id);
+      const nonMafiaPlayers = state.players.filter(
+        pd => pd.id !== mafia.id && players.find(p => p.id === pd.id)?.role !== 'mafia'
+      );
+      for (const pd of nonMafiaPlayers) {
+        expect(pd.role).toBeUndefined();
+      }
     });
 
     it('reveals all roles when game ended', () => {
