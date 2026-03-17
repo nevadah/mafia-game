@@ -1,6 +1,6 @@
-# MafiaTest
+# mafia-game
 
-MafiaTest is a TypeScript monorepo for a multiplayer implementation of the social deduction game Mafia.
+mafia-game is a TypeScript monorepo for a multiplayer implementation of the social deduction game Mafia.
 
 It contains:
 
