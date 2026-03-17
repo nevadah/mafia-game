@@ -18,6 +18,8 @@ import {
  */
 export interface BroadcastRef {
   broadcast?: (gameId: string, msg: ServerToClientMessage) => void;
+  /** Send a personalised message to each connected player in a game. */
+  broadcastPerPlayer?: (gameId: string, makeMsg: (playerId: string) => ServerToClientMessage) => void;
 }
 
 class HttpError extends Error {
@@ -232,10 +234,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
       }
 
       game.start();
-      broadcast(game.id, {
+      broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
         type: 'game_started',
-        payload: { state: game.toState() }
-      });
+        payload: { state: game.toState(pid) }
+      }));
       return res.json({ state: game.toState(actorId) });
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 400;
@@ -449,9 +451,16 @@ export function createWebSocketServer(
     }
   }
 
-  // Register broadcast so REST handlers can also broadcast events
+  // Register broadcast functions so REST handlers can also send events
   if (broadcastRef) {
     broadcastRef.broadcast = (gameId, msg) => broadcast(gameId, msg);
+    broadcastRef.broadcastPerPlayer = (gameId, makeMsg) => {
+      for (const [ws, info] of clients) {
+        if (info.gameId === gameId && info.playerId && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(makeMsg(info.playerId)));
+        }
+      }
+    };
   }
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {

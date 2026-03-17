@@ -1,7 +1,7 @@
 import http from 'http';
 import WebSocket from 'ws';
 import { GameManager } from '../src/GameManager';
-import { createApp, createWebSocketServer } from '../src/server';
+import { createApp, createWebSocketServer, BroadcastRef } from '../src/server';
 
 interface MsgClient {
   ws: WebSocket;
@@ -64,11 +64,14 @@ describe('WebSocket Server', () => {
     jest.setTimeout(15000);
   });
 
+  let broadcastRef: BroadcastRef;
+
   beforeEach((done) => {
     gameManager = new GameManager();
-    const app = createApp(gameManager);
+    broadcastRef = {};
+    const app = createApp(gameManager, broadcastRef);
     server = http.createServer(app);
-    createWebSocketServer(server, gameManager);
+    createWebSocketServer(server, gameManager, broadcastRef);
     server.listen(0, () => {
       const addr = server.address();
       port = typeof addr === 'object' && addr ? addr.port : 0;
@@ -398,5 +401,103 @@ describe('WebSocket Server', () => {
     client.ws.send(JSON.stringify({ type: 'get_state' }));
     // No response expected - verify socket is still open
     expect(client.ws.readyState).toBe(WebSocket.OPEN);
+  });
+
+  // ── game_started sends per-player state (role visibility) ─────────────────
+
+  it('game_started sends each player their own role, not others', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
+    const { player: carol } = gameManager.joinGame(game.id, 'Carol');
+    const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
+
+    // All four connect before the game starts
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    const carolClient = await connect(`/?gameId=${game.id}&playerId=${carol.id}`);
+    await carolClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    await bobClient.getNextMessage();   // player_joined
+    const daveClient = await connect(`/?gameId=${game.id}&playerId=${dave.id}`);
+    await daveClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    await bobClient.getNextMessage();   // player_joined
+    await carolClient.getNextMessage(); // player_joined
+
+    // Start the game via HTTP (triggers broadcastPerPlayer game_started)
+    const res = await fetch(`http://localhost:${port}/games/${game.id}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hostPlayer.id })
+    });
+    expect(res.ok).toBe(true);
+
+    // Each client receives game_started with only their own role set
+    const [aliceMsg, bobMsg, carolMsg, daveMsg] = await Promise.all([
+      aliceClient.getNextMessage(),
+      bobClient.getNextMessage(),
+      carolClient.getNextMessage(),
+      daveClient.getNextMessage()
+    ]);
+
+    function myRole(msg: Record<string, unknown>, playerId: string): string | undefined {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      const players = state?.players as Array<Record<string, unknown>>;
+      return players?.find(p => p.id === playerId)?.role as string | undefined;
+    }
+
+    function othersHaveNoRole(msg: Record<string, unknown>, playerId: string): boolean {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      const players = state?.players as Array<Record<string, unknown>>;
+      return players?.filter(p => p.id !== playerId).every(p => p.role === undefined) ?? false;
+    }
+
+    expect(aliceMsg.type).toBe('game_started');
+    expect(myRole(aliceMsg, hostPlayer.id)).toBeDefined();
+    expect(othersHaveNoRole(aliceMsg, hostPlayer.id)).toBe(true);
+
+    expect(bobMsg.type).toBe('game_started');
+    expect(myRole(bobMsg, bob.id)).toBeDefined();
+    expect(othersHaveNoRole(bobMsg, bob.id)).toBe(true);
+
+    expect(carolMsg.type).toBe('game_started');
+    expect(myRole(carolMsg, carol.id)).toBeDefined();
+    expect(othersHaveNoRole(carolMsg, carol.id)).toBe(true);
+
+    expect(daveMsg.type).toBe('game_started');
+    expect(myRole(daveMsg, dave.id)).toBeDefined();
+    expect(othersHaveNoRole(daveMsg, dave.id)).toBe(true);
+  });
+
+  // ── vote_cast broadcast includes the full votes map ────────────────────────
+
+  it('vote_cast broadcast includes updated votes map', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
+    const { player: carol } = gameManager.joinGame(game.id, 'Carol');
+    const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
+    game.start();
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined for bob
+
+    // Bob casts a vote for Carol via WS
+    bobClient.ws.send(JSON.stringify({ type: 'cast_vote', payload: { targetId: carol.id } }));
+
+    // Alice should receive vote_cast with a votes map
+    const voteMsg = await aliceClient.getNextMessage();
+    expect(voteMsg.type).toBe('vote_cast');
+    const payload = voteMsg.payload as Record<string, unknown>;
+    expect(payload.votes).toBeDefined();
+    expect((payload.votes as Record<string, string>)[bob.id]).toBe(carol.id);
+
+    void dave; // suppress unused variable warning
   });
 });
