@@ -425,9 +425,17 @@ export class MafiaClient extends EventEmitter {
       }
       case 'player_joined':
       case 'player_left':
-      case 'vote_cast':
       case 'player_eliminated':
-      case 'game_ended':
+      case 'game_ended': {
+        const p = msg.payload as { state?: GameState } | undefined;
+        if (p?.state) {
+          this._gameState = p.state;
+          this.emit('state_update', this._gameState);
+        }
+        this.emit(msg.type, msg.payload);
+        break;
+      }
+      case 'vote_cast':
         this.emit(msg.type, msg.payload);
         break;
       case 'error':

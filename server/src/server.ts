@@ -539,15 +539,18 @@ export function createWebSocketServer(
 
       if (info?.gameId && info?.playerId) {
         const game = gameManager.getGame(info.gameId);
-        if (game) {
-          const player = game.getPlayer(info.playerId);
-          if (player) {
-            player.setConnected(false);
+        if (game && game.getPlayer(info.playerId)) {
+          try {
+            const { deletedGame } = gameManager.leaveGame(info.gameId, info.playerId);
+            if (!deletedGame) {
+              broadcast(info.gameId, {
+                type: 'player_left',
+                payload: { playerId: info.playerId, state: game.toState() }
+              });
+            }
+          } catch {
+            // player or game already removed
           }
-          broadcast(info.gameId, {
-            type: 'player_left',
-            payload: { playerId: info.playerId, state: game.toState() }
-          });
         }
       }
     });

@@ -97,7 +97,8 @@ Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC
 - Role visibility rules: roles are secret during an active game; all roles are revealed at game end.
 - Resolve gating: `/resolve-votes` and `/resolve-night` block unless all required actions are submitted, unless `force: true` is passed.
 - Tie behavior: day vote tie → no elimination; night mafia vote tie → no kill.
-- Host leaving deletes the game.
+- WebSocket disconnect is treated the same as an explicit leave — the player is removed from the game and their session is revoked. Closing the Electron window mid-game removes the player.
+- Host leaving or disconnecting deletes the game.
 
 ## Documentation
 

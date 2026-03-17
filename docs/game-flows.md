@@ -52,9 +52,9 @@
 
 ## 6. Leave/Disconnect Flow
 
-- Disconnect (`WebSocket close`) marks player as not connected and broadcasts `player_left` event.
-- Leave (`POST /games/:gameId/leave`) removes player from game and sessions.
-- If host leaves, game is deleted (host migration is not implemented).
+- Disconnect (`WebSocket close`) removes player from game and sessions, same as an explicit leave. Broadcasts `player_left` to remaining players.
+- Leave (`POST /games/:gameId/leave`) removes player from game and sessions. Broadcasts `player_left` to remaining players.
+- If host leaves or disconnects, game is deleted (host migration is not implemented). No `player_left` broadcast is sent when the game is deleted.
 
 ## 7. State Visibility Rules
 

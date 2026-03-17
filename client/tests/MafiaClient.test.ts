@@ -790,6 +790,31 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(events).toHaveLength(1);
   });
 
+  it('emits state_update and updates gameState on player_joined with state', async () => {
+    const joinedState = makeGameState({ readyCount: 0 });
+    const { client, ws } = await makeConnectedClient();
+
+    const stateUpdates: GameState[] = [];
+    const joinedEvents: unknown[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    client.on('player_joined', (p) => joinedEvents.push(p));
+    ws.receive({ type: 'player_joined', payload: { playerId: 'p2', state: joinedState } });
+
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0]).toEqual(joinedState);
+    expect(client.gameState).toEqual(joinedState);
+    expect(joinedEvents).toHaveLength(1);
+  });
+
+  it('does not emit state_update on player_joined without state', async () => {
+    const { client, ws } = await makeConnectedClient();
+
+    const stateUpdates: GameState[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    ws.receive({ type: 'player_joined', payload: { playerId: 'p2' } });
+    expect(stateUpdates).toHaveLength(0);
+  });
+
   it('emits player_left event', async () => {
     const { client, ws } = await makeConnectedClient();
 
@@ -797,6 +822,22 @@ describe('MafiaClient — connect (WebSocket)', () => {
     client.on('player_left', (p) => events.push(p));
     ws.receive({ type: 'player_left', payload: { playerId: 'p2' } });
     expect(events).toHaveLength(1);
+  });
+
+  it('emits state_update and updates gameState on player_left with state', async () => {
+    const leftState = makeGameState();
+    const { client, ws } = await makeConnectedClient();
+
+    const stateUpdates: GameState[] = [];
+    const leftEvents: unknown[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    client.on('player_left', (p) => leftEvents.push(p));
+    ws.receive({ type: 'player_left', payload: { playerId: 'p2', state: leftState } });
+
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0]).toEqual(leftState);
+    expect(client.gameState).toEqual(leftState);
+    expect(leftEvents).toHaveLength(1);
   });
 
   it('emits vote_cast event', async () => {
@@ -817,6 +858,22 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(events).toHaveLength(1);
   });
 
+  it('emits state_update and updates gameState on player_eliminated with state', async () => {
+    const eliminatedState = makeGameState({ status: 'active', phase: 'night' });
+    const { client, ws } = await makeConnectedClient();
+
+    const stateUpdates: GameState[] = [];
+    const eliminatedEvents: unknown[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    client.on('player_eliminated', (p) => eliminatedEvents.push(p));
+    ws.receive({ type: 'player_eliminated', payload: { playerId: 'p2', state: eliminatedState } });
+
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0]).toEqual(eliminatedState);
+    expect(client.gameState).toEqual(eliminatedState);
+    expect(eliminatedEvents).toHaveLength(1);
+  });
+
   it('emits game_ended event and summary is available', async () => {
     const endedState = makeGameState({
       status: 'ended',
@@ -832,6 +889,22 @@ describe('MafiaClient — connect (WebSocket)', () => {
     client.on('game_ended', (p) => events.push(p));
     ws.receive({ type: 'game_ended', payload: { winner: 'town', state: endedState } });
     expect(events).toHaveLength(1);
+  });
+
+  it('emits state_update and updates gameState on game_ended with state', async () => {
+    const endedState = makeGameState({ status: 'ended', phase: 'ended', winner: 'mafia' });
+    const { client, ws } = await makeConnectedClient();
+
+    const stateUpdates: GameState[] = [];
+    const endedEvents: unknown[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+    client.on('game_ended', (p) => endedEvents.push(p));
+    ws.receive({ type: 'game_ended', payload: { winner: 'mafia', state: endedState } });
+
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0]).toEqual(endedState);
+    expect(client.gameState).toEqual(endedState);
+    expect(endedEvents).toHaveLength(1);
   });
 
   it('emits server_error event', async () => {

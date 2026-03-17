@@ -292,6 +292,55 @@ describe('WebSocket Server', () => {
     expect(leaveMsg.type).toBe('player_left');
   });
 
+  it('removes player from game on WebSocket disconnect', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob } = gameManager.joinGame(game.id, 'Bob');
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage(); // Bob connected
+    await aliceClient.getNextMessage(); // player_joined — confirms Bob is registered
+
+    await bobClient.close();
+    await aliceClient.getNextMessage(); // player_left — confirms server processed the close
+
+    expect(game.getPlayer(bob.id)).toBeUndefined();
+    expect(game.getPlayerCount()).toBe(1);
+  });
+
+  it('allows same player name to rejoin after WebSocket disconnect', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob } = gameManager.joinGame(game.id, 'Bob');
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage(); // Bob connected
+    await aliceClient.getNextMessage(); // player_joined
+
+    await bobClient.close();
+    await aliceClient.getNextMessage(); // player_left — server has processed disconnect
+
+    expect(() => gameManager.joinGame(game.id, 'Bob')).not.toThrow();
+  });
+
+  it('deletes game when host disconnects via WebSocket', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const gameId = game.id;
+
+    const hostClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await hostClient.getNextMessage(); // connected
+
+    await hostClient.close();
+    // No broadcast when game is deleted; use a short delay to let the server process the close
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(gameManager.getGame(gameId)).toBeUndefined();
+  });
+
   it('handles mark_ready message and broadcasts player_ready', async () => {
     const { game, hostPlayer } = gameManager.createGame('Alice');
     const { player: bob } = gameManager.joinGame(game.id, 'Bob');
