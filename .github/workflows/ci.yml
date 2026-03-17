@@ -43,3 +43,13 @@ jobs:
             echo "Disallowed warning/deprecation output detected in client tests."
             exit 1
           fi
+
+      - name: Test renderer (strict)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:renderer --workspace=client 2>&1 | tee /tmp/test-renderer.log
+          if grep -Eiq '\b(warn(ing)?|deprecated)\b' /tmp/test-renderer.log; then
+            echo "Disallowed warning/deprecation output detected in renderer tests."
+            exit 1
+          fi
