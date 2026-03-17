@@ -28,6 +28,8 @@ function summarizeResult(result) {
 }
 
 export default function App() {
+  // ── Theme ──────────────────────────────────────────────────────────────────
+
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem('mafia-theme');
     if (stored === 'light' || stored === 'dark') return stored;
@@ -43,11 +45,16 @@ export default function App() {
     setTheme(t => t === 'dark' ? 'light' : 'dark');
   }, []);
 
+  // ── Entry form state ───────────────────────────────────────────────────────
+
+  const [joinMode, setJoinMode] = useState(false);
   const [serverUrl, setServerUrl] = useState('http://localhost:3000');
   const [playerName, setPlayerName] = useState('');
   const [gameIdInput, setGameIdInput] = useState('');
 
-  const [status, setStatus] = useState({ message: 'Not connected', error: false });
+  // ── Game state ─────────────────────────────────────────────────────────────
+
+  const [status, setStatus] = useState({ message: '', error: false });
   const [currentState, setCurrentState] = useState(null);
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [currentGameId, setCurrentGameId] = useState(null);
@@ -57,13 +64,8 @@ export default function App() {
   const currentStateRef = useRef(currentState);
   const currentGameIdRef = useRef(currentGameId);
 
-  useEffect(() => {
-    currentStateRef.current = currentState;
-  }, [currentState]);
-
-  useEffect(() => {
-    currentGameIdRef.current = currentGameId;
-  }, [currentGameId]);
+  useEffect(() => { currentStateRef.current = currentState; }, [currentState]);
+  useEffect(() => { currentGameIdRef.current = currentGameId; }, [currentGameId]);
 
   const me = useMemo(() => {
     if (!currentState || !currentPlayerId) return null;
@@ -78,27 +80,24 @@ export default function App() {
       return currentState.players.filter((p) => p.isAlive && p.id !== me.id);
     }
     if (currentState.phase === 'night') {
-      if (me.role !== 'mafia' && me.role !== 'doctor' && me.role !== 'sheriff') {
-        return [];
-      }
+      if (me.role !== 'mafia' && me.role !== 'doctor' && me.role !== 'sheriff') return [];
       return currentState.players.filter((p) => p.isAlive);
     }
     return [];
   }, [currentState, me]);
 
   useEffect(() => {
-    if (!targetCandidates.length) {
-      setTargetId('');
-      return;
-    }
+    if (!targetCandidates.length) { setTargetId(''); return; }
     if (!targetCandidates.some((p) => p.id === targetId)) {
       setTargetId(targetCandidates[0].id);
     }
   }, [targetCandidates, targetId]);
 
-  const inLobby = Boolean(currentState && currentState.phase === 'lobby' && currentState.status === 'waiting');
-  const inDay = Boolean(currentState && currentState.phase === 'day' && currentState.status === 'active');
-  const inNight = Boolean(currentState && currentState.phase === 'night' && currentState.status === 'active');
+  const inLobby  = Boolean(currentState && currentState.phase === 'lobby' && currentState.status === 'waiting');
+  const inDay    = Boolean(currentState && currentState.phase === 'day'   && currentState.status === 'active');
+  const inNight  = Boolean(currentState && currentState.phase === 'night' && currentState.status === 'active');
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   function showStatus(message, error = false) {
     setStatus({ message, error });
@@ -115,12 +114,12 @@ export default function App() {
     setCurrentPlayerId(null);
     setCurrentGameId(null);
     setTargetId('');
+    setStatus({ message: '', error: false });
   }
 
   function onConnected(result) {
     setCurrentPlayerId(result.playerId);
     setCurrentGameId(result.gameId);
-    showStatus(`Connected · Game ${result.gameId} · You ${result.playerId}`);
     applyState(result.state);
   }
 
@@ -128,13 +127,10 @@ export default function App() {
     try {
       showStatus(`${label}...`);
       const result = await action();
-      if (result && result.state) {
-        applyState(result.state);
-      }
+      if (result && result.state) applyState(result.state);
       const summary = summarizeResult(result);
-      if (summary) {
-        showStatus(`${label} complete (${summary})`);
-      }
+      if (summary) showStatus(`${label} complete (${summary})`);
+      else showStatus('');
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
     }
@@ -147,186 +143,259 @@ export default function App() {
     return `mafia://join?${params.toString()}`;
   }
 
+  async function handleCreate() {
+    if (!playerName.trim()) { showStatus('Enter a player name', true); return; }
+    try {
+      showStatus('Creating game...');
+      const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim());
+      onConnected(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  async function handleJoin() {
+    if (!playerName.trim()) { showStatus('Enter a player name', true); return; }
+    if (!gameIdInput.trim()) { showStatus('Enter a game code', true); return; }
+    try {
+      showStatus('Joining game...');
+      const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
+      onConnected(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  async function handleLeave() {
+    try {
+      const result = await window.mafia.leaveGame();
+      resetGameUi();
+      showStatus(result.deletedGame ? 'Game closed.' : 'You left the game.');
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  async function handleBrowse() {
+    try {
+      const games = await window.mafia.listGames(serverUrl.trim());
+      if (!games.length) { showStatus('No waiting games found.'); return; }
+      const summary = games.map((g) => `${g.gameId} (${g.readyCount}/${g.playerCount})`).join(' · ');
+      showStatus(`Waiting games: ${summary}`);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  // ── WebSocket event subscriptions ──────────────────────────────────────────
+
   useEffect(() => {
     window.mafia.onStateUpdate((state) => applyState(state));
-    window.mafia.onPlayerJoined(() => showStatus('A player joined'));
-    window.mafia.onPlayerLeft(() => showStatus('A player left'));
+    window.mafia.onPlayerJoined(() => showStatus('A player joined.'));
+    window.mafia.onPlayerLeft(() => showStatus('A player left.'));
     window.mafia.onPlayerReady((payload) => {
-      if (payload && payload.state) {
-        applyState(payload.state);
-      }
-      showStatus('Ready status updated');
+      if (payload && payload.state) applyState(payload.state);
+      showStatus('Ready status updated.');
     });
-    window.mafia.onVoteCast(() => showStatus('Vote cast'));
-    window.mafia.onPlayerEliminated((payload) => showStatus(`Player eliminated: ${payload?.playerId || 'unknown'}`));
-    window.mafia.onGameStarted(() => showStatus('Game started'));
-    window.mafia.onGameEnded((payload) => showStatus(`Game over: ${payload?.winner || 'unknown'} wins`));
+    window.mafia.onVoteCast(() => showStatus('Vote cast.'));
+    window.mafia.onPlayerEliminated((payload) => showStatus(`${payload?.playerId || 'A player'} was eliminated.`));
+    window.mafia.onGameStarted(() => showStatus('Game started.'));
+    window.mafia.onGameEnded((payload) => showStatus(`Game over — ${payload?.winner || 'unknown'} wins!`));
     window.mafia.onServerError((payload) => showStatus(`Server error: ${payload?.message || 'unknown'}`, true));
     window.mafia.onDeepLink((payload) => {
       if (currentStateRef.current) {
-        showStatus('Join link received. Leave current game first to use it.', true);
+        showStatus('Join link received — leave your current game first.', true);
         return;
       }
-      if (payload?.serverUrl) {
-        setServerUrl(payload.serverUrl);
-      }
+      if (payload?.serverUrl) setServerUrl(payload.serverUrl);
       if (payload?.gameId) {
         setGameIdInput(payload.gameId);
-        showStatus(`Join link loaded for game ${payload.gameId}`);
+        setJoinMode(true);
+        showStatus(`Join link loaded for game ${payload.gameId}.`);
       }
     });
   }, []);
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  const canStart = isHost
+    && currentState?.players.length >= currentState?.settings?.minPlayers
+    && currentState?.readyCount === currentState?.players.length;
+
   return (
     <div className="app">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="app-header">
-        <h1>Mafia Game</h1>
+        <h1>Mafia</h1>
         <button className="theme-toggle" onClick={toggleTheme}>
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
       </div>
 
+      {/* ── Entry screen ───────────────────────────────────────────────────── */}
       {!currentState && (
-        <div className="card">
-          <label>Server URL</label>
-          <input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} />
+        <div className="entry-screen">
+          <p className="entry-subtitle">A social deduction game</p>
 
-          <label>Your Name</label>
-          <input
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            placeholder="Enter your name"
-          />
+          <div className="card entry-card">
+            <div className="mode-tabs">
+              <button
+                className={`mode-tab${!joinMode ? ' active' : ''}`}
+                onClick={() => setJoinMode(false)}
+              >
+                New Game
+              </button>
+              <button
+                className={`mode-tab${joinMode ? ' active' : ''}`}
+                onClick={() => setJoinMode(true)}
+              >
+                Join Game
+              </button>
+            </div>
 
-          <label>Game ID (to join existing)</label>
-          <input
-            value={gameIdInput}
-            onChange={(e) => setGameIdInput(e.target.value)}
-            placeholder="Leave blank to create new game"
-          />
+            <div className="field">
+              <label>Your Name</label>
+              <input
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Enter your name"
+                onKeyDown={(e) => e.key === 'Enter' && (joinMode ? handleJoin() : handleCreate())}
+                autoFocus
+              />
+            </div>
 
-          <div className="controls">
-            <button
-              onClick={async () => {
-                if (!playerName.trim()) {
-                  showStatus('Enter a player name', true);
-                  return;
-                }
-                try {
-                  showStatus('Creating game...');
-                  const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim());
-                  onConnected(result);
-                } catch (err) {
-                  showStatus(`Error: ${err.message}`, true);
-                }
-              }}
-            >
-              Create Game
+            {joinMode && (
+              <div className="field">
+                <label>Game Code</label>
+                <input
+                  value={gameIdInput}
+                  onChange={(e) => setGameIdInput(e.target.value)}
+                  placeholder="Enter game code"
+                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                />
+              </div>
+            )}
+
+            <button className="btn-full" onClick={joinMode ? handleJoin : handleCreate}>
+              {joinMode ? 'Join Game' : 'Create Game'}
             </button>
 
-            <button
-              onClick={async () => {
-                if (!playerName.trim()) {
-                  showStatus('Enter a player name', true);
-                  return;
-                }
-                if (!gameIdInput.trim()) {
-                  showStatus('Enter a game ID to join', true);
-                  return;
-                }
-                try {
-                  showStatus('Joining game...');
-                  const result = await window.mafia.joinGame(
-                    serverUrl.trim(),
-                    gameIdInput.trim(),
-                    playerName.trim()
-                  );
-                  onConnected(result);
-                } catch (err) {
-                  showStatus(`Error: ${err.message}`, true);
-                }
-              }}
-            >
-              Join Game
-            </button>
+            {!joinMode && (
+              <button className="btn-full btn-secondary" onClick={handleBrowse}>
+                Browse Waiting Games
+              </button>
+            )}
 
-            <button
-              onClick={async () => {
-                try {
-                  const games = await window.mafia.listGames(serverUrl.trim());
-                  if (!games.length) {
-                    showStatus('No waiting games found');
-                    return;
-                  }
-                  const summary = games.map((g) => `${g.gameId} (${g.readyCount}/${g.playerCount})`).join(' | ');
-                  showStatus(`Waiting games: ${summary}`);
-                } catch (err) {
-                  showStatus(`Error: ${err.message}`, true);
-                }
-              }}
-            >
-              List Waiting Games
-            </button>
+            <details className="advanced-section">
+              <summary>Advanced</summary>
+              <div className="field">
+                <label>Server URL</label>
+                <input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} />
+              </div>
+            </details>
           </div>
         </div>
       )}
 
-      {currentState && (
+      {/* ── Waiting room ───────────────────────────────────────────────────── */}
+      {currentState && inLobby && (
+        <div className="card stack">
+          <div className="lobby-header">
+            <span className="phase">Lobby</span>
+            <span className="lobby-meta">
+              {currentState.players.length} / {currentState.settings.maxPlayers} players
+              &nbsp;·&nbsp;
+              {currentState.readyCount} ready
+            </span>
+          </div>
+
+          <div>
+            <label>Game Code</label>
+            <div className="game-code-box">
+              <span className="game-code-value">{currentState.id}</span>
+              <div className="game-code-actions">
+                <button
+                  className="copy-btn"
+                  onClick={async () => {
+                    try { await copyText(currentState.id); showStatus('Game code copied.'); }
+                    catch { showStatus(`Copy failed. Code: ${currentState.id}`, true); }
+                  }}
+                >
+                  Copy Code
+                </button>
+                <button
+                  className="copy-link-btn"
+                  onClick={async () => {
+                    const link = buildJoinDeepLink();
+                    if (!link) { showStatus('No join link available.', true); return; }
+                    try { await copyText(link); showStatus('Invite link copied.'); }
+                    catch { showStatus(`Copy failed. Link: ${link}`, true); }
+                  }}
+                >
+                  Copy Invite Link
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label>Players</label>
+            <div className="players">
+              {currentState.players.map((player) => (
+                <div key={player.id} className="player">
+                  <div className="player-name">{player.name}</div>
+                  <div className="badges">
+                    {player.id === currentPlayerId && <span className="badge you">You</span>}
+                    {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                    <span className={`badge ${player.isReady ? 'ready' : 'not-ready'}`}>
+                      {player.isReady ? 'Ready' : 'Not Ready'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="lobby-actions">
+            {!me?.isReady
+              ? <button onClick={() => runAction('Marking ready', window.mafia.markReady)}>Ready</button>
+              : <button onClick={() => runAction('Marking unready', window.mafia.markUnready)}>Unready</button>
+            }
+            {isHost && (
+              <button disabled={!canStart} onClick={() => runAction('Starting game', window.mafia.startGame)}>
+                Start Game
+              </button>
+            )}
+            <button className="btn-secondary" onClick={handleLeave}>Leave</button>
+          </div>
+
+          {isHost && !canStart && (
+            <p className="lobby-hint">
+              {currentState.players.length < currentState.settings.minPlayers
+                ? `Need at least ${currentState.settings.minPlayers} players to start.`
+                : 'Waiting for all players to ready up.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Active game ────────────────────────────────────────────────────── */}
+      {currentState && !inLobby && (
         <>
           <div className="card stack">
             <div>
               <div className="phase">Phase: {currentState.phase}</div>
               <p className="meta">
-                Round {currentState.round} · Status: {currentState.status} · Ready {currentState.readyCount}/
-                {currentState.players.length}
+                Round {currentState.round} · Status: {currentState.status}
               </p>
               <p className="meta">
-                You {currentPlayerId || '-'} · Role {me?.role || 'hidden'} {isHost ? '· Host' : ''}
+                You: {currentPlayerId || '-'} · Role: {me?.role || 'hidden'} {isHost ? '· Host' : ''}
               </p>
             </div>
 
             <div>
-              <label>Game Code (share this to invite players)</label>
-              <div className="game-code-box">
-                <span className="game-code-value">{currentState.id}</span>
-                <div className="game-code-actions">
-                  <button
-                    className="copy-btn"
-                    onClick={async () => {
-                      try {
-                        await copyText(currentState.id);
-                        showStatus(`Game code copied: ${currentState.id}`);
-                      } catch {
-                        showStatus(`Copy failed. Code: ${currentState.id}`, true);
-                      }
-                    }}
-                  >
-                    Copy Code
-                  </button>
-                  <button
-                    className="copy-link-btn"
-                    onClick={async () => {
-                      const link = buildJoinDeepLink();
-                      if (!link) {
-                        showStatus('No join link available', true);
-                        return;
-                      }
-                      try {
-                        await copyText(link);
-                        showStatus('Join link copied');
-                      } catch {
-                        showStatus(`Copy failed. Link: ${link}`, true);
-                      }
-                    }}
-                  >
-                    Copy Join Link
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label>Players In Lobby</label>
+              <label>Players</label>
               <div className="players">
                 {currentState.players.map((player) => (
                   <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
@@ -334,15 +403,9 @@ export default function App() {
                     <div className="badges">
                       {player.id === currentPlayerId && <span className="badge you">You</span>}
                       {player.id === currentState.hostId && <span className="badge host">Host</span>}
-                      {currentState.status === 'waiting' ? (
-                        <span className={`badge ${player.isReady ? 'ready' : 'not-ready'}`}>
-                          {player.isReady ? 'Ready' : 'Not Ready'}
-                        </span>
-                      ) : (
-                        <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
-                          {player.isAlive ? 'Alive' : 'Dead'}
-                        </span>
-                      )}
+                      <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
+                        {player.isAlive ? 'Alive' : 'Dead'}
+                      </span>
                       {player.role && <span className="badge">{player.role}</span>}
                     </div>
                   </div>
@@ -359,10 +422,8 @@ export default function App() {
                   disabled={!targetCandidates.length}
                 >
                   {!targetCandidates.length && <option value="">No valid targets</option>}
-                  {targetCandidates.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.name}
-                    </option>
+                  {targetCandidates.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
@@ -379,15 +440,6 @@ export default function App() {
             </div>
 
             <div className="controls">
-              <button disabled={!inLobby || !me || me.isReady} onClick={() => runAction('Marking ready', window.mafia.markReady)}>
-                Ready
-              </button>
-              <button disabled={!inLobby || !me || !me.isReady} onClick={() => runAction('Marking unready', window.mafia.markUnready)}>
-                Unready
-              </button>
-              <button disabled={!inLobby || !isHost} onClick={() => runAction('Starting game', window.mafia.startGame)}>
-                Start
-              </button>
               <button
                 disabled={!inDay || !me || !me.isAlive || !targetCandidates.length}
                 onClick={() => runAction('Casting vote', () => window.mafia.castVote(targetId))}
@@ -400,43 +452,32 @@ export default function App() {
               >
                 Night Action
               </button>
-              <button disabled={!inDay || !isHost} onClick={() => runAction('Resolving day', () => window.mafia.resolveVotes(forceResolve))}>
+              <button
+                disabled={!inDay || !isHost}
+                onClick={() => runAction('Resolving day', () => window.mafia.resolveVotes(forceResolve))}
+              >
                 Resolve Day
               </button>
-              <button disabled={!inNight || !isHost} onClick={() => runAction('Resolving night', () => window.mafia.resolveNight(forceResolve))}>
+              <button
+                disabled={!inNight || !isHost}
+                onClick={() => runAction('Resolving night', () => window.mafia.resolveNight(forceResolve))}
+              >
                 Resolve Night
               </button>
               <button
                 onClick={async () => {
-                  try {
-                    const state = await window.mafia.getState();
-                    applyState(state);
-                    showStatus('State refreshed');
-                  } catch (err) {
-                    showStatus(`Error: ${err.message}`, true);
-                  }
+                  try { const s = await window.mafia.getState(); applyState(s); showStatus('State refreshed.'); }
+                  catch (err) { showStatus(`Error: ${err.message}`, true); }
                 }}
               >
                 Refresh
               </button>
-              <button
-                onClick={async () => {
-                  try {
-                    const result = await window.mafia.leaveGame();
-                    resetGameUi();
-                    showStatus(result.deletedGame ? 'Left game; host/game closed' : 'Left game');
-                  } catch (err) {
-                    showStatus(`Error: ${err.message}`, true);
-                  }
-                }}
-              >
-                Leave Game
-              </button>
+              <button onClick={handleLeave}>Leave Game</button>
               <button
                 onClick={async () => {
                   await window.mafia.disconnect();
                   resetGameUi();
-                  showStatus('Disconnected');
+                  showStatus('Disconnected.');
                 }}
               >
                 Disconnect
@@ -451,7 +492,11 @@ export default function App() {
         </>
       )}
 
-      <div className={`status ${status.error ? 'error' : ''}`}>{status.message}</div>
+      {/* ── Status bar ─────────────────────────────────────────────────────── */}
+      {status.message && (
+        <div className={`status${status.error ? ' error' : ''}`}>{status.message}</div>
+      )}
+
     </div>
   );
 }

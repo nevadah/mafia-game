@@ -222,6 +222,134 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .phase { font-size: 1.25rem; font-weight: 700; color: var(--color-accent); text-transform: uppercase; }
 .meta  { color: var(--color-text-muted); margin-top: 0.5rem; }
 
+/* ── Entry screen ────────────────────────────────────────────────────────── */
+
+.entry-screen {
+  max-width: 420px;
+  margin: 2rem auto 0;
+}
+
+.entry-subtitle {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.entry-card {
+  padding: 1.5rem;
+}
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.mode-tab {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: 0;
+  font-weight: 500;
+  padding: 0.6rem 1rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mode-tab:hover:not(:disabled) {
+  filter: none;
+  background: var(--color-surface-deep);
+  color: var(--color-text);
+}
+
+.mode-tab:active:not(:disabled) {
+  transform: none;
+  filter: none;
+}
+
+.mode-tab.active {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.field {
+  margin-bottom: 0.75rem;
+}
+
+.field label {
+  margin-bottom: 0.3rem;
+}
+
+.field input {
+  margin-bottom: 0;
+}
+
+.btn-full {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.btn-secondary {
+  background: var(--color-surface-deep);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  filter: none;
+  border-color: var(--color-text-muted);
+}
+
+.advanced-section {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.advanced-section summary {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0.5rem;
+}
+
+.advanced-section summary:hover {
+  color: var(--color-text);
+}
+
+/* ── Waiting room ────────────────────────────────────────────────────────── */
+
+.lobby-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.lobby-meta {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.lobby-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lobby-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
 /* ── Checkbox ────────────────────────────────────────────────────────────── */
 
 .checkbox-label {
