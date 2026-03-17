@@ -60,6 +60,8 @@ export default function App() {
   const [currentGameId, setCurrentGameId] = useState(null);
   const [forceResolve, setForceResolve] = useState(false);
   const [targetId, setTargetId] = useState('');
+  // Tracks which (phase, round) the current player has submitted a night action for
+  const [submittedNightKey, setSubmittedNightKey] = useState(null);
 
   const currentStateRef = useRef(currentState);
   const currentGameIdRef = useRef(currentGameId);
@@ -484,49 +486,156 @@ export default function App() {
         );
       })()}
 
-      {/* ── Night phase (placeholder — full UI coming in next PR) ───────────── */}
-      {currentState && inNight && (
-        <>
-          <div className="card stack">
-            <div className="day-header">
-              <span className="phase">Night {currentState.round}</span>
-              <span className="phase-meta">
-                {me?.role === 'mafia'    && 'Choose a target to eliminate.'}
-                {me?.role === 'doctor'   && 'Choose a player to protect.'}
-                {me?.role === 'sheriff'  && 'Choose a player to investigate.'}
-                {(!me?.role || me.role === 'townsperson') && 'Wait for night to resolve…'}
-              </span>
-            </div>
-            <p className="meta">
-              Playing as <strong>{me?.name}</strong>
-              {me?.role && <> · Role: <strong>{me.role}</strong></>}
-              {isHost && ' · Host'}
-            </p>
-          </div>
+      {/* ── Night phase ────────────────────────────────────────────────────── */}
+      {currentState && inNight && (() => {
+        const nightNumber = currentState.round + 1;
+        const myRole = me?.role;
+        const nightKey = `night-${currentState.round}`;
+        const hasSubmitted = submittedNightKey === nightKey;
 
-          <div className="card stack">
-            <div className="section-heading">Players</div>
-            <div className="players">
-              {currentState.players.map((player) => (
-                <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
-                  <div className="player-name">{player.name}</div>
-                  <div className="badges">
-                    {player.id === currentPlayerId && <span className="badge you">You</span>}
-                    {player.id === currentState.hostId && <span className="badge host">Host</span>}
-                    <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
-                      {player.isAlive ? 'Alive' : 'Eliminated'}
-                    </span>
-                  </div>
+        const nightTargets = (() => {
+          if (!me?.isAlive) return [];
+          if (myRole === 'doctor') return currentState.players.filter((p) => p.isAlive);
+          if (myRole === 'mafia' || myRole === 'sheriff') {
+            return currentState.players.filter((p) => p.isAlive && p.id !== me.id);
+          }
+          return [];
+        })();
+
+        const actionLabel = myRole === 'mafia' ? 'Eliminate' : myRole === 'doctor' ? 'Protect' : 'Investigate';
+        const investigation = currentState.investigatedThisRound;
+        const investigatedPlayer = investigation
+          ? currentState.players.find((p) => p.id === investigation.target)
+          : null;
+
+        const deadPlayers = currentState.players.filter((p) => !p.isAlive);
+
+        return (
+          <>
+            <div className="card stack">
+              <div className="day-header">
+                <span className="phase">Night {nightNumber}</span>
+                <span className="phase-meta">
+                  {myRole === 'mafia'   && 'Choose a target to eliminate.'}
+                  {myRole === 'doctor'  && 'Choose a player to protect.'}
+                  {myRole === 'sheriff' && 'Choose a player to investigate.'}
+                  {(!myRole || myRole === 'townsperson') && 'The town sleeps…'}
+                </span>
+              </div>
+              <p className="meta">
+                Playing as <strong>{me?.name}</strong>
+                {myRole && <> · Role: <strong>{myRole}</strong></>}
+                {isHost && ' · Host'}
+              </p>
+            </div>
+
+            {myRole === 'sheriff' && investigatedPlayer && (
+              <div className="card stack">
+                <div className="section-heading">Previous Investigation</div>
+                <p className="meta">
+                  <strong>{investigatedPlayer.name}</strong> is{' '}
+                  <strong className={investigation.result === 'mafia' ? 'role-mafia' : 'role-town'}>
+                    {investigation.result === 'mafia' ? 'Mafia' : 'not Mafia'}
+                  </strong>.
+                </p>
+              </div>
+            )}
+
+            {nightTargets.length > 0 && (
+              <div className="card stack">
+                <div className="section-heading">
+                  {myRole === 'mafia'   && 'Select a target to eliminate'}
+                  {myRole === 'doctor'  && 'Select a player to protect'}
+                  {myRole === 'sheriff' && 'Select a player to investigate'}
                 </div>
-              ))}
-            </div>
-          </div>
+                {hasSubmitted ? (
+                  <p className="lobby-hint">Action submitted. Waiting for night to resolve…</p>
+                ) : (
+                  <div className="players">
+                    {nightTargets.map((player) => (
+                      <div key={player.id} className="player">
+                        <div className="player-name">{player.name}</div>
+                        <div className="badges">
+                          {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                        </div>
+                        <button
+                          className="vote-btn"
+                          onClick={() => runAction(actionLabel, async () => {
+                            const result = await window.mafia.nightAction(player.id);
+                            setSubmittedNightKey(nightKey);
+                            return result;
+                          })}
+                        >
+                          {actionLabel}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-          <div className="controls">
-            <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
-          </div>
-        </>
-      )}
+            {myRole === 'townsperson' && me?.isAlive && (
+              <div className="card stack">
+                <p className="lobby-hint">The night phase is underway. Await the results at dawn.</p>
+              </div>
+            )}
+
+            <div className="card stack">
+              <div className="section-heading">Players</div>
+              <div className="players">
+                {currentState.players.filter((p) => p.isAlive).map((player) => (
+                  <div key={player.id} className="player">
+                    <div className="player-name">{player.name}</div>
+                    <div className="badges">
+                      {player.id === currentPlayerId && <span className="badge you">You</span>}
+                      {player.id === currentState.hostId && <span className="badge host">Host</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {deadPlayers.length > 0 && (
+              <div className="card stack">
+                <div className="section-heading">Eliminated</div>
+                <div className="players">
+                  {deadPlayers.map((player) => (
+                    <div key={player.id} className="player dead">
+                      <div className="player-name">{player.name}</div>
+                      <div className="badges">
+                        <span className="badge dead">Eliminated</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isHost && (
+              <div className="card stack">
+                <div className="day-controls">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={forceResolve}
+                      onChange={(e) => setForceResolve(e.target.checked)}
+                    />
+                    Force resolve
+                  </label>
+                  <button onClick={() => runAction('Resolving night', () => window.mafia.resolveNight(forceResolve))}>
+                    Resolve Night
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="controls">
+              <button className="btn-secondary" onClick={handleLeave}>Leave Game</button>
+            </div>
+          </>
+        );
+      })()}
 
       {/* ── Game over (placeholder — full UI coming in next PR) ─────────────── */}
       {currentState && isEnded && (

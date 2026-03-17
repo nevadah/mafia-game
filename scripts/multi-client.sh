@@ -20,7 +20,7 @@ echo "Building Electron main process..."
 echo "Launching $N client instance(s)..."
 PIDS=()
 for i in $(seq 1 "$N"); do
-  (cd "$CLIENT_DIR" && MAFIA_MULTI_INSTANCE=1 electron . ) &
+  (cd "$CLIENT_DIR" && MAFIA_MULTI_INSTANCE=1 ELECTRON_RENDERER_URL=http://localhost:5173 electron . ) &
   PIDS+=($!)
   echo "  Started instance $i (PID $!)"
 done

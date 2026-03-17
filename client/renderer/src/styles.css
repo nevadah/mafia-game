@@ -404,3 +404,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   width: auto;
   margin: 0;
 }
+
+/* ── Night phase ─────────────────────────────────────────────────────────── */
+
+.role-mafia { color: var(--color-accent); }
+.role-town  { color: var(--color-state-text); }
