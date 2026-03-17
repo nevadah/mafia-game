@@ -203,8 +203,8 @@ describe('Game', () => {
       const { game } = makeGame(4);
       game.start();
       expect(game.getStatus()).toBe('active');
-      expect(game.getPhase()).toBe('day');
-      expect(game.getRound()).toBe(1);
+      expect(game.getPhase()).toBe('night');
+      expect(game.getRound()).toBe(0);
     });
 
     it('throws when not enough players', () => {
@@ -269,6 +269,7 @@ describe('Game', () => {
     it('records a vote', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       game.castVote(players[0].id, players[1].id);
       const votes = game.getVotes();
       expect(votes[players[0].id]).toBe(players[1].id);
@@ -276,8 +277,7 @@ describe('Game', () => {
 
     it('throws when not in day phase', () => {
       const { game, players } = makeGame(4);
-      game.start();
-      game.advancePhase();
+      game.start(); // starts in night
       expect(() => game.castVote(players[0].id, players[1].id)).toThrow(
         'Voting is only allowed during the day phase'
       );
@@ -286,6 +286,7 @@ describe('Game', () => {
     it('throws when voting for yourself', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       expect(() => game.castVote(players[0].id, players[0].id)).toThrow(
         'Cannot vote for yourself'
       );
@@ -294,6 +295,7 @@ describe('Game', () => {
     it('throws when voter is dead', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       players[0].eliminate();
       expect(() => game.castVote(players[0].id, players[1].id)).toThrow(
         'Voter is not a valid alive player'
@@ -303,6 +305,7 @@ describe('Game', () => {
     it('throws when target is dead', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       players[1].eliminate();
       expect(() => game.castVote(players[0].id, players[1].id)).toThrow(
         'Target is not a valid alive player'
@@ -312,6 +315,7 @@ describe('Game', () => {
     it('throws for unknown voter', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       expect(() => game.castVote('unknown', players[1].id)).toThrow(
         'Voter is not a valid alive player'
       );
@@ -322,6 +326,7 @@ describe('Game', () => {
     it('eliminates the player with most votes', () => {
       const { game, players } = makeGame(5);
       game.start();
+      game.advancePhase();
       game.castVote(players[0].id, players[2].id);
       game.castVote(players[1].id, players[2].id);
       game.castVote(players[3].id, players[4].id);
@@ -333,20 +338,21 @@ describe('Game', () => {
     it('returns null when no votes', () => {
       const { game } = makeGame(4);
       game.start();
+      game.advancePhase();
       const eliminated = game.resolveVotes();
       expect(eliminated).toBeNull();
     });
 
     it('throws when not in day phase', () => {
       const { game } = makeGame(4);
-      game.start();
-      game.advancePhase();
+      game.start(); // starts in night
       expect(() => game.resolveVotes()).toThrow('Can only resolve votes during day phase');
     });
 
     it('clears votes after resolution', () => {
       const { game, players } = makeGame(4);
       game.start();
+      game.advancePhase();
       game.castVote(players[0].id, players[1].id);
       game.resolveVotes();
       expect(Object.keys(game.getVotes()).length).toBe(0);
@@ -356,21 +362,22 @@ describe('Game', () => {
   // ── Phase management ───────────────────────────────────────────────────────
 
   describe('advancePhase', () => {
-    it('advances from day to night', () => {
-      const { game } = makeGame(4);
-      game.start();
-      expect(game.getPhase()).toBe('day');
-      game.advancePhase();
-      expect(game.getPhase()).toBe('night');
-    });
-
     it('advances from night to day and increments round', () => {
       const { game } = makeGame(4);
-      game.start();
-      game.advancePhase();
-      game.advancePhase();
+      game.start(); // night, round 0
+      expect(game.getPhase()).toBe('night');
+      game.advancePhase(); // night → day, round++
       expect(game.getPhase()).toBe('day');
-      expect(game.getRound()).toBe(2);
+      expect(game.getRound()).toBe(1);
+    });
+
+    it('advances from day to night', () => {
+      const { game } = makeGame(4);
+      game.start(); // night
+      game.advancePhase(); // → day
+      game.advancePhase(); // → night
+      expect(game.getPhase()).toBe('night');
+      expect(game.getRound()).toBe(1); // round does not increment on day → night
     });
 
     it('throws when game is not active', () => {
@@ -385,7 +392,6 @@ describe('Game', () => {
     it('records a night action for mafia', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
 
       const mafia = players.find(p => p.role === 'mafia')!;
       const target = players.find(p => p.role !== 'mafia')!;
@@ -397,7 +403,6 @@ describe('Game', () => {
     it('records a night action for sheriff', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
 
       const sheriff = players.find(p => p.role === 'sheriff')!;
       const target = players.find(p => p !== sheriff)!;
@@ -408,6 +413,7 @@ describe('Game', () => {
     it('throws when not in night phase', () => {
       const { game, players } = makeGame(6);
       game.start();
+      game.advancePhase(); // night → day
       const mafia = players.find(p => p.role === 'mafia')!;
       const target = players.find(p => p.role !== 'mafia')!;
       expect(() => game.submitNightAction(mafia.id, target.id)).toThrow(
@@ -418,7 +424,6 @@ describe('Game', () => {
     it('throws for townsperson', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const townsperson = players.find(p => p.role === 'townsperson')!;
       const target = players.find(p => p !== townsperson)!;
       expect(() => game.submitNightAction(townsperson.id, target.id)).toThrow(
@@ -429,7 +434,6 @@ describe('Game', () => {
     it('throws for dead actor', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const mafia = players.find(p => p.role === 'mafia')!;
       mafia.eliminate();
       const target = players.find(p => p !== mafia)!;
@@ -441,7 +445,6 @@ describe('Game', () => {
     it('throws for unknown actor', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const target = players[0];
       expect(() => game.submitNightAction('unknown', target.id)).toThrow(
         'Actor is not a valid alive player'
@@ -451,7 +454,6 @@ describe('Game', () => {
     it('throws when target is dead', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const mafia = players.find(p => p.role === 'mafia')!;
       const target = players.find(p => p.role !== 'mafia')!;
       target.eliminate();
@@ -465,7 +467,6 @@ describe('Game', () => {
     it('mafia eliminates target', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const mafia = players.find(p => p.role === 'mafia')!;
       const town = players.find(p => p.role === 'townsperson')!;
       game.submitNightAction(mafia.id, town.id);
@@ -477,7 +478,6 @@ describe('Game', () => {
     it('doctor saves mafia target', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const mafia = players.find(p => p.role === 'mafia')!;
       const doctor = players.find(p => p.role === 'doctor')!;
       const town = players.find(p => p.role === 'townsperson')!;
@@ -491,7 +491,6 @@ describe('Game', () => {
     it('sheriff investigates a player', () => {
       const { game, players } = makeGame(6);
       game.start();
-      game.advancePhase();
       const sheriff = players.find(p => p.role === 'sheriff')!;
       const mafia = players.find(p => p.role === 'mafia')!;
       game.submitNightAction(sheriff.id, mafia.id);
@@ -504,6 +503,7 @@ describe('Game', () => {
     it('throws when not in night phase', () => {
       const { game } = makeGame(4);
       game.start();
+      game.advancePhase(); // night → day
       expect(() => game.resolveNightActions()).toThrow(
         'Can only resolve night actions during night phase'
       );
@@ -512,7 +512,6 @@ describe('Game', () => {
     it('resolves with no actions (no elimination)', () => {
       const { game } = makeGame(4);
       game.start();
-      game.advancePhase();
       const eliminated = game.resolveNightActions();
       expect(eliminated).toBeNull();
     });

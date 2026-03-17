@@ -164,8 +164,8 @@ export class Game {
     }
     this.assignRoles();
     this.status = 'active';
-    this.phase = 'day';
-    this.round = 1;
+    this.phase = 'night';
+    this.round = 0;
     this.touch();
   }
 
