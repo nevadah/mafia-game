@@ -849,6 +849,31 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(events).toHaveLength(1);
   });
 
+  it('emits state_update and updates votes on vote_cast with votes map', async () => {
+    const { client, ws } = await makeConnectedClient({ status: 'active', phase: 'day', votes: {} });
+
+    const stateUpdates: GameState[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+
+    ws.receive({ type: 'vote_cast', payload: { voterId: 'p1', targetId: 'p2', votes: { p1: 'p2' } } });
+
+    expect(stateUpdates).toHaveLength(1);
+    expect(stateUpdates[0].votes).toEqual({ p1: 'p2' });
+    expect(client.gameState?.votes).toEqual({ p1: 'p2' });
+  });
+
+  it('does not emit state_update on vote_cast when gameState is not set', async () => {
+    const { client, ws } = await makeConnectedClient();
+    // Clear the stored state to simulate an edge case
+    (client as unknown as { _gameState: undefined })._gameState = undefined;
+
+    const stateUpdates: GameState[] = [];
+    client.on('state_update', (s) => stateUpdates.push(s));
+
+    ws.receive({ type: 'vote_cast', payload: { voterId: 'p1', targetId: 'p2', votes: { p1: 'p2' } } });
+    expect(stateUpdates).toHaveLength(0);
+  });
+
   it('emits player_eliminated event', async () => {
     const { client, ws } = await makeConnectedClient();
 
