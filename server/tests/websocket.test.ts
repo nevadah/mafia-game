@@ -472,6 +472,164 @@ describe('WebSocket Server', () => {
     expect(othersHaveNoRole(daveMsg, dave.id)).toBe(true);
   });
 
+  // ── resolve-votes: phase_changed sends per-player state, correct phase ──────
+
+  it('phase_changed after resolve-votes sends each player their own role', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
+    const { player: carol } = gameManager.joinGame(game.id, 'Carol');
+    const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
+    game.start();
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    const carolClient = await connect(`/?gameId=${game.id}&playerId=${carol.id}`);
+    await carolClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    await bobClient.getNextMessage();
+    const daveClient = await connect(`/?gameId=${game.id}&playerId=${dave.id}`);
+    await daveClient.getNextMessage();
+    await aliceClient.getNextMessage(); // player_joined
+    await bobClient.getNextMessage();
+    await carolClient.getNextMessage();
+
+    // Force-resolve with no votes (day → night)
+    const res = await fetch(`http://localhost:${port}/games/${game.id}/resolve-votes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hostPlayer.id, force: true })
+    });
+    expect(res.ok).toBe(true);
+
+    const [aliceMsg, bobMsg, carolMsg, daveMsg] = await Promise.all([
+      aliceClient.getNextMessage(),
+      bobClient.getNextMessage(),
+      carolClient.getNextMessage(),
+      daveClient.getNextMessage()
+    ]);
+
+    function myRole(msg: Record<string, unknown>, playerId: string): string | undefined {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      const players = state?.players as Array<Record<string, unknown>>;
+      return players?.find(p => p.id === playerId)?.role as string | undefined;
+    }
+
+    function statePhase(msg: Record<string, unknown>): string | undefined {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      return state?.phase as string | undefined;
+    }
+
+    // Each message should be phase_changed, in night phase, with own role preserved
+    for (const [msg, pid] of [[aliceMsg, hostPlayer.id], [bobMsg, bob.id], [carolMsg, carol.id], [daveMsg, dave.id]] as const) {
+      expect(msg.type).toBe('phase_changed');
+      expect(statePhase(msg)).toBe('night');
+      expect(myRole(msg, pid)).toBeDefined();
+    }
+  });
+
+  it('player_eliminated after resolve-votes carries the new phase in state', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    gameManager.joinGame(game.id, 'Bob');
+    gameManager.joinGame(game.id, 'Carol');
+    gameManager.joinGame(game.id, 'Dave');
+    game.start();
+
+    // Pick a non-mafia target so eliminating them won't trigger a winner
+    const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
+
+    // All alive players vote for target
+    for (const p of game.getAlivePlayers()) {
+      if (p.id !== target.id) {
+        game.castVote(p.id, target.id);
+      } else {
+        // target votes for someone else to satisfy "all players voted"
+        const other = game.getAlivePlayers().find(q => q.id !== target.id)!;
+        game.castVote(target.id, other.id);
+      }
+    }
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+
+    const res = await fetch(`http://localhost:${port}/games/${game.id}/resolve-votes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hostPlayer.id, force: false })
+    });
+    expect(res.ok).toBe(true);
+
+    // Should receive player_eliminated with post-advance phase in state
+    const eliminatedMsg = await aliceClient.getNextMessage();
+    expect(eliminatedMsg.type).toBe('player_eliminated');
+    const eliminatedPayload = eliminatedMsg.payload as Record<string, unknown>;
+    expect(eliminatedPayload.playerId).toBe(target.id);
+    // State inside player_eliminated should reflect the new phase (night)
+    const stateInEliminated = eliminatedPayload.state as Record<string, unknown>;
+    expect(stateInEliminated.phase).toBe('night');
+  });
+
+  // ── resolve-night: phase_changed sends per-player state, correct phase ──────
+
+  it('phase_changed after resolve-night sends each player their own role', async () => {
+    const { game, hostPlayer } = gameManager.createGame('Alice');
+    const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
+    const { player: carol } = gameManager.joinGame(game.id, 'Carol');
+    const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
+    game.start();
+    game.resolveVotes(); // clear day votes (no votes cast)
+    game.advancePhase(); // day → night
+
+    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
+    await aliceClient.getNextMessage(); // connected
+    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
+    await bobClient.getNextMessage();
+    await aliceClient.getNextMessage();
+    const carolClient = await connect(`/?gameId=${game.id}&playerId=${carol.id}`);
+    await carolClient.getNextMessage();
+    await aliceClient.getNextMessage();
+    await bobClient.getNextMessage();
+    const daveClient = await connect(`/?gameId=${game.id}&playerId=${dave.id}`);
+    await daveClient.getNextMessage();
+    await aliceClient.getNextMessage();
+    await bobClient.getNextMessage();
+    await carolClient.getNextMessage();
+
+    // Force-resolve night (no actions submitted)
+    const res = await fetch(`http://localhost:${port}/games/${game.id}/resolve-night`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hostPlayer.id, force: true })
+    });
+    expect(res.ok).toBe(true);
+
+    const [aliceMsg, bobMsg, carolMsg, daveMsg] = await Promise.all([
+      aliceClient.getNextMessage(),
+      bobClient.getNextMessage(),
+      carolClient.getNextMessage(),
+      daveClient.getNextMessage()
+    ]);
+
+    function myRole(msg: Record<string, unknown>, playerId: string): string | undefined {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      const players = state?.players as Array<Record<string, unknown>>;
+      return players?.find(p => p.id === playerId)?.role as string | undefined;
+    }
+
+    function statePhase(msg: Record<string, unknown>): string | undefined {
+      const state = (msg.payload as Record<string, unknown>)?.state as Record<string, unknown>;
+      return state?.phase as string | undefined;
+    }
+
+    for (const [msg, pid] of [[aliceMsg, hostPlayer.id], [bobMsg, bob.id], [carolMsg, carol.id], [daveMsg, dave.id]] as const) {
+      expect(msg.type).toBe('phase_changed');
+      expect(statePhase(msg)).toBe('day');
+      expect(myRole(msg, pid)).toBeDefined();
+    }
+  });
+
   // ── vote_cast broadcast includes the full votes map ────────────────────────
 
   it('vote_cast broadcast includes updated votes map', async () => {

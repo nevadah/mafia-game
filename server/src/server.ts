@@ -293,26 +293,29 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
       }
 
       const eliminated = game.resolveVotes();
+      const winner = game.checkWinCondition();
 
-      if (eliminated) {
-        broadcast(game.id, {
-          type: 'player_eliminated',
-          payload: { playerId: eliminated, phase: 'day', state: game.toState() }
-        });
+      if (!winner) {
+        game.advancePhase();
       }
 
-      const winner = game.checkWinCondition();
+      if (eliminated) {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
+          type: 'player_eliminated',
+          payload: { playerId: eliminated, phase: game.getPhase(), state: game.toState(pid) }
+        }));
+      }
+
       if (winner) {
-        broadcast(game.id, {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
           type: 'game_ended',
-          payload: { winner, state: game.toState() }
-        });
+          payload: { winner, state: game.toState(pid) }
+        }));
       } else {
-        game.advancePhase();
-        broadcast(game.id, {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
           type: 'phase_changed',
-          payload: { phase: game.getPhase(), round: game.getRound(), state: game.toState() }
-        });
+          payload: { phase: game.getPhase(), round: game.getRound(), state: game.toState(pid) }
+        }));
       }
 
       return res.json({ eliminated, winner, state: game.toState(actorId) });
@@ -366,26 +369,29 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
       }
 
       const eliminated = game.resolveNightActions();
+      const winner = game.checkWinCondition();
 
-      if (eliminated) {
-        broadcast(game.id, {
-          type: 'player_eliminated',
-          payload: { playerId: eliminated, phase: 'night', state: game.toState() }
-        });
+      if (!winner) {
+        game.advancePhase();
       }
 
-      const winner = game.checkWinCondition();
+      if (eliminated) {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
+          type: 'player_eliminated',
+          payload: { playerId: eliminated, phase: game.getPhase(), state: game.toState(pid) }
+        }));
+      }
+
       if (winner) {
-        broadcast(game.id, {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
           type: 'game_ended',
-          payload: { winner, state: game.toState() }
-        });
+          payload: { winner, state: game.toState(pid) }
+        }));
       } else {
-        game.advancePhase();
-        broadcast(game.id, {
+        broadcastRef?.broadcastPerPlayer?.(game.id, (pid) => ({
           type: 'phase_changed',
-          payload: { phase: game.getPhase(), round: game.getRound(), state: game.toState() }
-        });
+          payload: { phase: game.getPhase(), round: game.getRound(), state: game.toState(pid) }
+        }));
       }
 
       return res.json({ eliminated, winner, state: game.toState(actorId) });
