@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 function fallbackCopy(text) {
   const temp = document.createElement('textarea');
@@ -28,6 +28,21 @@ function summarizeResult(result) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('mafia-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('mafia-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === 'dark' ? 'light' : 'dark');
+  }, []);
+
   const [serverUrl, setServerUrl] = useState('http://localhost:3000');
   const [playerName, setPlayerName] = useState('');
   const [gameIdInput, setGameIdInput] = useState('');
@@ -164,7 +179,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <h1>Mafia Game</h1>
+      <div className="app-header">
+        <h1>Mafia Game</h1>
+        <button className="theme-toggle" onClick={toggleTheme}>
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
+      </div>
 
       {!currentState && (
         <div className="card">
