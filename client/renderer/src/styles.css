@@ -60,6 +60,8 @@ button {
   font-weight: 600;
 }
 
+button:hover:not(:disabled) { filter: brightness(1.15); }
+button:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.9); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .status { font-size: 0.875rem; color: #aaa; margin-top: 0.5rem; }
