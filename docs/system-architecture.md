@@ -46,6 +46,14 @@
 - Restarting the server clears games and sessions.
 - Waiting games are pruned periodically when idle beyond configured TTL.
 
+## Localization
+
+- UI strings are managed with `i18next` + `react-i18next`.
+- All four locale bundles (en, de, es, fr) are pre-bundled at build time — no runtime network fetches, no Suspense boundary needed.
+- `i18n.ts` initializes the i18n instance with `useSuspense: false`; reads the saved language from `localStorage['mafia-language']` on startup.
+- The language switcher in the app header calls `i18n.changeLanguage(lang)` and persists the choice to localStorage.
+- To add a new UI string: add the key + English value to `en.json`, add the translations to `de.json`, `es.json`, and `fr.json`, then use `t('key')` in the component.
+
 ## Non-Goals (Current)
 
 - Long-term persistence (DB)

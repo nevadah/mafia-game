@@ -20,14 +20,22 @@ npm run dev:client
 Optional hot-reload renderer workflow (recommended for UI changes):
 
 ```bash
-npm run dev:renderer --workspace=client
-npm run dev:electron --workspace=client
+npm run dev:backend                    # terminal 1: server + Vite renderer dev server
+npm run dev:electron --workspace=client  # terminal 2: Electron (loads from Vite)
 ```
 
 Multiple client instances (for local multiplayer testing):
 
 ```bash
-npm run dev:multi --workspace=client   # run in as many terminals as needed
+npm run dev:backend                    # terminal 1
+npm run dev:multi --workspace=client   # terminal 2+, repeat as needed
+```
+
+Headless simulation (smoke-test the full client ↔ server contract without a UI):
+
+```bash
+npm run simulate          # 4 players
+npm run simulate -- 6     # 6 players
 ```
 
 ## Typical Change Workflow
@@ -38,7 +46,8 @@ npm run dev:multi --workspace=client   # run in as many terminals as needed
 - `client/src/main.ts`
 - `client/src/preload.ts`
 - `client/renderer/src/App.jsx`
-4. Add/update tests in corresponding workspace test folders.
+4. For new UI strings: add to `client/renderer/src/locales/en.json` first, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
+5. Add/update tests in corresponding workspace test folders.
 
 ## AI Agent Notes
 
