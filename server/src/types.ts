@@ -24,7 +24,7 @@ export interface GameState {
   votes: Record<string, string>;
   nightActions: Record<string, string>;
   eliminatedThisRound?: string;
-  savedThisRound?: string;
+  doctorProtectedThisRound?: string | null;
   investigatedThisRound?: { target: string; result: Role } | null;
   settings: GameSettings;
   readyCount: number;

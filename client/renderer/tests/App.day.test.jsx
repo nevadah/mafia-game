@@ -268,10 +268,10 @@ describe('App — day phase eliminated players', () => {
   });
 });
 
-// ── Sheriff investigation result (day phase) ─────────────────────────────────
+// ── Sheriff investigation result (night summary modal) ───────────────────────
 
-describe('App — day phase sheriff investigation result', () => {
-  it('shows investigation result for sheriff when investigatedThisRound is set', async () => {
+describe('App — day phase sheriff investigation result (night summary modal)', () => {
+  it('shows investigation result for sheriff in the night summary modal', async () => {
     const user = userEvent.setup();
     const state = makeDayState({
       players: [
@@ -282,12 +282,12 @@ describe('App — day phase sheriff investigation result', () => {
       investigatedThisRound: { target: 'p2', result: 'mafia' }
     });
     await enterDayPhase(user, state);
-    const card = screen.getByText(/Previous Investigation/i).closest('.card');
-    expect(within(card).getByText(/Bob/)).toBeInTheDocument();
-    expect(within(card).getByText(/Mafia/)).toBeInTheDocument();
+    const modal = document.querySelector('.night-summary-modal');
+    expect(within(modal).getByText(/Bob/)).toBeInTheDocument();
+    expect(within(modal).getByText(/Mafia/)).toBeInTheDocument();
   });
 
-  it('shows "not Mafia" result correctly in day phase', async () => {
+  it('shows "not Mafia" result in night summary modal', async () => {
     const user = userEvent.setup();
     const state = makeDayState({
       players: [
@@ -298,23 +298,26 @@ describe('App — day phase sheriff investigation result', () => {
       investigatedThisRound: { target: 'p3', result: 'townsperson' }
     });
     await enterDayPhase(user, state);
-    expect(screen.getByText(/not Mafia/i)).toBeInTheDocument();
+    const modal = document.querySelector('.night-summary-modal');
+    expect(within(modal).getByText(/not Mafia/i)).toBeInTheDocument();
   });
 
-  it('does not show investigation card when investigatedThisRound is null', async () => {
+  it('does not show investigation note when investigatedThisRound is null', async () => {
     const user = userEvent.setup();
     await enterDayPhase(user, makeDayState({ investigatedThisRound: null }));
-    expect(screen.queryByText(/Previous Investigation/i)).not.toBeInTheDocument();
+    const modal = document.querySelector('.night-summary-modal');
+    expect(within(modal).queryByText(/You investigated/i)).not.toBeInTheDocument();
   });
 
-  it('does not show investigation card for non-sheriff players', async () => {
+  it('does not show investigation note for non-sheriff players', async () => {
     const user = userEvent.setup();
     const state = makeDayState({
       investigatedThisRound: { target: 'p2', result: 'mafia' }
     });
     // p1 is 'townsperson' in makeDayState
     await enterDayPhase(user, state);
-    expect(screen.queryByText(/Previous Investigation/i)).not.toBeInTheDocument();
+    const modal = document.querySelector('.night-summary-modal');
+    expect(within(modal).queryByText(/You investigated/i)).not.toBeInTheDocument();
   });
 });
 

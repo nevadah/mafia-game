@@ -96,6 +96,13 @@
   "statusInviteFailed": "Copy failed. Link: {{link}}",
   "statusNoJoinLink": "No join link available.",
 
+  "nightSummaryTitle": "Night {{round}} Results",
+  "nightSummaryNoKill": "No one was eliminated tonight.",
+  "nightSummaryEliminated": "{{name}} was eliminated by the Mafia.",
+  "nightSummaryDoctorProtected": "You protected {{name}}.",
+  "nightSummaryInvestigated": "You investigated {{name}}. They are {{result}}.",
+  "nightSummaryDismiss": "Got it",
+
   "actionMarkingReady": "Marking ready",
   "actionMarkingUnready": "Marking unready",
   "actionStartingGame": "Starting game",

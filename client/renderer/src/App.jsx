@@ -66,6 +66,8 @@ export default function App() {
   const [targetId, setTargetId] = useState('');
   // Tracks which (phase, round) the current player has submitted a night action for
   const [submittedNightKey, setSubmittedNightKey] = useState(null);
+  // Tracks which round's night summary modal has been dismissed
+  const [dismissedNightSummaryRound, setDismissedNightSummaryRound] = useState(null);
 
   const currentStateRef = useRef(currentState);
   const currentGameIdRef = useRef(currentGameId);
@@ -417,11 +419,6 @@ export default function App() {
         );
         const alivePlayers = currentState.players.filter((p) => p.isAlive);
         const deadPlayers  = currentState.players.filter((p) => !p.isAlive);
-        const dayInvestigation = currentState.investigatedThisRound;
-        const dayInvestigatedPlayer = dayInvestigation
-          ? currentState.players.find((p) => p.id === dayInvestigation.target)
-          : null;
-
         return (
           <>
             <div className="card stack">
@@ -435,19 +432,6 @@ export default function App() {
                 {isHost && ` · ${t('hostBadge')}`}
               </p>
             </div>
-
-            {me?.role === 'sheriff' && dayInvestigatedPlayer && (
-              <div className="card stack">
-                <div className="section-heading">{t('prevInvestigation')}</div>
-                <p className="meta">
-                  <strong>{dayInvestigatedPlayer.name}</strong>{' '}
-                  {t('investigationIs')}{' '}
-                  <strong className={dayInvestigation.result === 'mafia' ? 'role-mafia' : 'role-town'}>
-                    {t(dayInvestigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')}
-                  </strong>.
-                </p>
-              </div>
-            )}
 
             <div className="card stack">
               <div className="section-heading">{t('castYourVote')}</div>
@@ -719,6 +703,51 @@ export default function App() {
           </div>
         </>
       )}
+
+      {/* ── Night summary modal ────────────────────────────────────────────── */}
+      {inDay && currentState.round > 0 && dismissedNightSummaryRound !== currentState.round && (() => {
+        const victim = currentState.eliminatedThisRound
+          ? currentState.players.find((p) => p.id === currentState.eliminatedThisRound)
+          : null;
+        const protected_ = currentState.doctorProtectedThisRound
+          ? currentState.players.find((p) => p.id === currentState.doctorProtectedThisRound)
+          : null;
+        const investigation = currentState.investigatedThisRound;
+        const investigatedPlayer = investigation
+          ? currentState.players.find((p) => p.id === investigation.target)
+          : null;
+
+        return (
+          <div className="night-summary-overlay">
+            <div className="night-summary-modal">
+              <div className="night-summary-title">
+                {t('nightSummaryTitle', { round: currentState.round })}
+              </div>
+              <p className={victim ? 'night-summary-kill' : 'night-summary-no-kill'}>
+                {victim
+                  ? t('nightSummaryEliminated', { name: victim.name })
+                  : t('nightSummaryNoKill')}
+              </p>
+              {me?.role === 'doctor' && protected_ && (
+                <p className="night-summary-role-note">
+                  {t('nightSummaryDoctorProtected', { name: protected_.name })}
+                </p>
+              )}
+              {me?.role === 'sheriff' && investigatedPlayer && (
+                <p className="night-summary-role-note">
+                  {t('nightSummaryInvestigated', {
+                    name: investigatedPlayer.name,
+                    result: t(investigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')
+                  })}
+                </p>
+              )}
+              <button onClick={() => setDismissedNightSummaryRound(currentState.round)}>
+                {t('nightSummaryDismiss')}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
       {status.message && (
