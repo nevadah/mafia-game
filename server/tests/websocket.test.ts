@@ -141,6 +141,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     game.start();
+    game.advancePhase(); // night → day
 
     const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
     await client.getNextMessage(); // connected
@@ -156,6 +157,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     game.start();
+    game.advancePhase(); // night → day
 
     const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
     await client.getNextMessage(); // connected
@@ -171,6 +173,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     game.start();
+    game.advancePhase(); // night → day
 
     const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
     await client.getNextMessage(); // connected
@@ -188,9 +191,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     gameManager.joinGame(game.id, 'Eve');
-    game.start();
-    game.resolveVotes(); // no votes, OK
-    game.advancePhase(); // day -> night
+    game.start(); // starts in night
 
     const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
     const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
@@ -209,7 +210,8 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     gameManager.joinGame(game.id, 'Eve');
-    game.start(); // starts in day phase
+    game.start();
+    game.advancePhase(); // night → day
 
     const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
     const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
@@ -228,8 +230,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     gameManager.joinGame(game.id, 'Eve');
-    game.start();
-    game.advancePhase(); // night
+    game.start(); // starts in night
 
     const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
 
@@ -496,7 +497,10 @@ describe('WebSocket Server', () => {
     await bobClient.getNextMessage();
     await carolClient.getNextMessage();
 
-    // Force-resolve with no votes (day → night)
+    // Advance to day first (game starts in night)
+    game.advancePhase();
+
+    // Force-resolve votes (day → night)
     const res = await fetch(`http://localhost:${port}/games/${game.id}/resolve-votes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -536,6 +540,7 @@ describe('WebSocket Server', () => {
     gameManager.joinGame(game.id, 'Carol');
     gameManager.joinGame(game.id, 'Dave');
     game.start();
+    game.advancePhase(); // night → day
 
     // Pick a non-mafia target so eliminating them won't trigger a winner
     const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
@@ -578,9 +583,7 @@ describe('WebSocket Server', () => {
     const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
     const { player: carol } = gameManager.joinGame(game.id, 'Carol');
     const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
-    game.start();
-    game.resolveVotes(); // clear day votes (no votes cast)
-    game.advancePhase(); // day → night
+    game.start(); // starts in night
 
     const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
     await aliceClient.getNextMessage(); // connected
@@ -638,6 +641,7 @@ describe('WebSocket Server', () => {
     const { player: carol } = gameManager.joinGame(game.id, 'Carol');
     const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
     game.start();
+    game.advancePhase(); // night → day
 
     const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
     await aliceClient.getNextMessage(); // connected

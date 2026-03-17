@@ -275,6 +275,8 @@ describe('REST API', () => {
         playerIds.push(joinRes.body.playerId);
       }
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      // Game starts in night; advance to day
+      await request(app).post(`/games/${gameId}/resolve-night`).send({ playerId: hostId, force: true });
       return { gameId, playerIds, hostId };
     }
 
@@ -316,6 +318,8 @@ describe('REST API', () => {
         playerIds.push(joinRes.body.playerId);
       }
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      // Game starts in night; advance to day
+      await request(app).post(`/games/${gameId}/resolve-night`).send({ playerId: hostId, force: true });
       return { gameId, playerIds, hostId };
     }
 
@@ -375,9 +379,8 @@ describe('REST API', () => {
         const joinRes = await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
         playerIds.push(joinRes.body.playerId);
       }
+      // Game starts in night
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
-      // Advance to night
-      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId, force: true });
       return { gameId, playerIds, hostId };
     }
 
@@ -411,8 +414,8 @@ describe('REST API', () => {
       for (const name of ['Bob', 'Carol', 'Dave', 'Eve']) {
         await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
       }
+      // Game starts in night
       await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
-      await request(app).post(`/games/${gameId}/resolve-votes`).send({ playerId: hostId, force: true });
       return { gameId, hostId };
     }
 
