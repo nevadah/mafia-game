@@ -417,6 +417,10 @@ export default function App() {
         );
         const alivePlayers = currentState.players.filter((p) => p.isAlive);
         const deadPlayers  = currentState.players.filter((p) => !p.isAlive);
+        const dayInvestigation = currentState.investigatedThisRound;
+        const dayInvestigatedPlayer = dayInvestigation
+          ? currentState.players.find((p) => p.id === dayInvestigation.target)
+          : null;
 
         return (
           <>
@@ -431,6 +435,19 @@ export default function App() {
                 {isHost && ` · ${t('hostBadge')}`}
               </p>
             </div>
+
+            {me?.role === 'sheriff' && dayInvestigatedPlayer && (
+              <div className="card stack">
+                <div className="section-heading">{t('prevInvestigation')}</div>
+                <p className="meta">
+                  <strong>{dayInvestigatedPlayer.name}</strong>{' '}
+                  {t('investigationIs')}{' '}
+                  <strong className={dayInvestigation.result === 'mafia' ? 'role-mafia' : 'role-town'}>
+                    {t(dayInvestigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')}
+                  </strong>.
+                </p>
+              </div>
+            )}
 
             <div className="card stack">
               <div className="section-heading">{t('castYourVote')}</div>
