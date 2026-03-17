@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { MafiaClient } from './MafiaClient';
 
+app.setName('Mafia');
+
 let mainWindow: BrowserWindow | null = null;
 let client: MafiaClient | null = null;
 let pendingDeepLink: { gameId?: string; serverUrl?: string } | null = null;
