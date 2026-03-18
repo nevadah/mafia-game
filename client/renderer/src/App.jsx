@@ -258,19 +258,20 @@ export default function App() {
     window.mafia.onServerError((payload) =>
       showStatus(t('statusServerError', { message: payload?.message || 'unknown' }), true)
     );
-    window.mafia.onDeepLink((payload) => {
+    function handleDeepLink(payload) {
+      if (!payload) return;
       if (currentStateRef.current) {
         showStatus(t('statusJoinLinkBlocked'), true);
         return;
       }
-      if (payload?.serverUrl) setServerUrl(payload.serverUrl);
+      if (payload.serverUrl) setServerUrl(payload.serverUrl);
 
-      if (payload?.action === 'create') {
+      if (payload.action === 'create') {
         if (payload.name) {
           setPlayerName(payload.name);
           pendingAutoAction.current = { action: 'create', name: payload.name };
         }
-      } else if (payload?.gameId) {
+      } else if (payload.gameId) {
         setGameIdInput(payload.gameId);
         setJoinMode(true);
         if (payload.name) {
@@ -280,7 +281,12 @@ export default function App() {
           showStatus(t('statusJoinLinkLoaded', { gameId: payload.gameId }));
         }
       }
-    });
+    }
+
+    window.mafia.onDeepLink(handleDeepLink);
+
+    // Pull any deep link that arrived before the renderer was ready to listen.
+    window.mafia.getStartupDeepLink().then(handleDeepLink);
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────

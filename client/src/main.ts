@@ -44,7 +44,10 @@ function deepLinkFromArgv(argv: string[]): string | undefined {
 }
 
 function dispatchDeepLink(payload: DeepLinkPayload): void {
-  if (mainWindow && !mainWindow.isDestroyed()) {
+  // If the window is loaded and the renderer is ready, push immediately.
+  // Otherwise buffer — the renderer will pull via mafia:get-startup-deep-link
+  // once its useEffect has run and listeners are registered.
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
     mainWindow.webContents.send('mafia:deep_link', payload);
   } else {
     pendingDeepLink = payload;
@@ -70,12 +73,6 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   }
-  mainWindow.webContents.on('did-finish-load', () => {
-    if (pendingDeepLink) {
-      mainWindow?.webContents.send('mafia:deep_link', pendingDeepLink);
-      pendingDeepLink = null;
-    }
-  });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -145,6 +142,13 @@ app.on('window-all-closed', () => {
 });
 
 // ── IPC handlers (renderer → main) ──────────────────────────────────────────
+
+// Renderer pulls this once its useEffect has run, avoiding the push-before-listen race.
+ipcMain.handle('mafia:get-startup-deep-link', () => {
+  const link = pendingDeepLink;
+  pendingDeepLink = null;
+  return link;
+});
 
 ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName: string, settings?: object) => {
   client?.disconnect();
