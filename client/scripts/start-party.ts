@@ -10,7 +10,7 @@
  *   npm run dev:party -- 4 http://localhost:4000   # custom server URL
  */
 
-import { spawn } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import http from 'http';
 import path from 'path';
 
@@ -30,16 +30,28 @@ const BASE_ENV = {
   ELECTRON_RENDERER_URL: RENDERER_URL
 };
 
+const children: ChildProcess[] = [];
+
 function spawnWindow(deepLink: string, label: string): void {
   const child = spawn(ELECTRON_BIN, ['.', deepLink], {
     cwd: CLIENT_DIR,
     env: BASE_ENV,
-    stdio: 'ignore',
-    detached: true
+    stdio: 'ignore'
   });
-  child.unref();
+  children.push(child);
   console.log(`[party] opened ${label} → ${deepLink}`);
 }
+
+function shutdown(): void {
+  console.log('\n[party] shutting down...');
+  for (const child of children) {
+    child.kill();
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 function fetchGames(serverUrl: string): Promise<Array<{ gameId: string }>> {
   return new Promise((resolve, reject) => {
@@ -87,7 +99,7 @@ async function main(): Promise<void> {
     spawnWindow(joinLink, `Player${i}`);
   }
 
-  console.log('[party] all windows launched');
+  console.log('[party] all windows launched — press Ctrl-C to close all clients');
 }
 
 main().catch((err: Error) => {
