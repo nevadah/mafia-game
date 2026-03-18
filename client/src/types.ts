@@ -19,6 +19,14 @@ export interface GameSettings {
   hasSheriff: boolean;
 }
 
+export interface EliminationRecord {
+  playerId: string;
+  playerName: string;
+  role: Role;
+  by: 'mafia' | 'town';
+  round: number;
+}
+
 export interface ChatMessage {
   senderId: string;
   senderName: string;
@@ -42,6 +50,7 @@ export interface GameState {
   settings: GameSettings;
   readyCount: number;
   messages: ChatMessage[];
+  eliminations: EliminationRecord[];
 }
 
 export interface EndGameSummary {

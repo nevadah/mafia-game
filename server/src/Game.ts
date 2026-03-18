@@ -6,6 +6,7 @@ import {
   GameState,
   GameSettings,
   ChatMessage,
+  EliminationRecord,
   Role
 } from './types';
 
@@ -31,6 +32,7 @@ export class Game {
   private doctorProtectedThisRound?: string;
   private investigatedThisRound?: { target: string; result: Role } | null;
   private messages: ChatMessage[];
+  private eliminations: EliminationRecord[];
   readonly settings: GameSettings;
   private readonly createdAt: number;
   private updatedAt: number;
@@ -45,6 +47,7 @@ export class Game {
     this.votes = new Map();
     this.nightActions = new Map();
     this.messages = [];
+    this.eliminations = [];
     this.settings = { ...DEFAULT_SETTINGS, ...settings };
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
@@ -281,6 +284,13 @@ export class Game {
     if (player) {
       player.eliminate();
       this.eliminatedThisRound = eliminated;
+      this.eliminations.push({
+        playerId: player.id,
+        playerName: player.name,
+        role: player.role ?? 'townsperson',
+        by: 'town',
+        round: this.round
+      });
       this.touch();
     }
 
@@ -421,6 +431,13 @@ export class Game {
           target.eliminate();
           eliminated = mafiaTarget;
           this.eliminatedThisRound = mafiaTarget;
+          this.eliminations.push({
+            playerId: target.id,
+            playerName: target.name,
+            role: target.role ?? 'townsperson',
+            by: 'mafia',
+            round: this.round
+          });
         }
       }
     }
@@ -516,7 +533,8 @@ export class Game {
         : null,
       settings: this.settings,
       readyCount: this.getReadyCount(),
-      messages: this.getMessages()
+      messages: this.getMessages(),
+      eliminations: [...this.eliminations]
     };
   }
 }

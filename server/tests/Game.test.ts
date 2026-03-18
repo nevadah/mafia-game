@@ -705,6 +705,97 @@ describe('Game', () => {
     });
   });
 
+  // ── Elimination tracking ───────────────────────────────────────────────────
+
+  describe('eliminations', () => {
+    it('records a town elimination when resolveVotes eliminates a player', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase(); // night → day, round 1
+      game.castVote(players[0].id, players[1].id);
+      game.castVote(players[2].id, players[1].id);
+      game.castVote(players[3].id, players[1].id);
+      game.resolveVotes();
+      const state = game.toState();
+      expect(state.eliminations).toHaveLength(1);
+      expect(state.eliminations[0].playerId).toBe(players[1].id);
+      expect(state.eliminations[0].by).toBe('town');
+      expect(state.eliminations[0].playerName).toBe(players[1].name);
+      expect(state.eliminations[0].round).toBe(1);
+    });
+
+    it('records no town elimination on a tie vote', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      game.castVote(players[0].id, players[1].id);
+      game.castVote(players[2].id, players[3].id);
+      game.resolveVotes();
+      expect(game.toState().eliminations).toHaveLength(0);
+    });
+
+    it('records a mafia elimination when resolveNightActions kills a player', () => {
+      const { game, players } = makeGame(4);
+      game.start(); // night, round 0
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(mafia.id, town.id);
+      game.resolveNightActions();
+      const state = game.toState();
+      expect(state.eliminations).toHaveLength(1);
+      expect(state.eliminations[0].playerId).toBe(town.id);
+      expect(state.eliminations[0].by).toBe('mafia');
+      expect(state.eliminations[0].round).toBe(0);
+    });
+
+    it('records no mafia elimination when doctor saves the target', () => {
+      const { game, players } = makeGame(6);
+      game.start();
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const doctor = players.find(p => p.role === 'doctor')!;
+      const town = players.find(p => p.role === 'townsperson')!;
+      game.submitNightAction(mafia.id, town.id);
+      game.submitNightAction(doctor.id, town.id);
+      game.resolveNightActions();
+      expect(game.toState().eliminations).toHaveLength(0);
+    });
+
+    it('accumulates eliminations across multiple rounds', () => {
+      const { game, players } = makeGame(6);
+      game.start(); // night round 0
+      const mafia = players.find(p => p.role === 'mafia')!;
+      const town1 = players.filter(p => p.role === 'townsperson')[0];
+      game.submitNightAction(mafia.id, town1.id);
+      game.resolveNightActions();
+      game.advancePhase(); // → day round 1
+
+      const alivePlayers = game.getAlivePlayers();
+      const voter = alivePlayers.find(p => p.id !== mafia.id)!;
+      const target = alivePlayers.find(p => p.id !== mafia.id && p.id !== voter.id)!;
+      game.castVote(mafia.id, target.id);
+      game.castVote(voter.id, target.id);
+      game.resolveVotes();
+
+      expect(game.toState().eliminations).toHaveLength(2);
+      expect(game.toState().eliminations[0].by).toBe('mafia');
+      expect(game.toState().eliminations[1].by).toBe('town');
+    });
+
+    it('records the role of eliminated players', () => {
+      const { game } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      const alive = game.getAlivePlayers();
+      const voter = alive[0];
+      const target = alive.find(p => p.id !== voter.id)!;
+      game.castVote(voter.id, target.id);
+      game.castVote(alive.find(p => p.id !== voter.id && p.id !== target.id)!.id, target.id);
+      game.resolveVotes();
+      const elim = game.toState().eliminations[0];
+      expect(elim.role).toBe(target.role);
+    });
+  });
+
   // ── toState ────────────────────────────────────────────────────────────────
 
   describe('toState', () => {

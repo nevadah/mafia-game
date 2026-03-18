@@ -447,6 +447,68 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   padding-top: 0.25rem;
 }
 
+/* ── Game Over ───────────────────────────────────────────────────────────── */
+
+.game-over-banner {
+  text-align: center;
+}
+
+.game-over-winner {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.game-over-winner.town  { color: #27ae60; }
+.game-over-winner.mafia { color: #e74c3c; }
+
+.game-over-condition {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.game-over-outcome {
+  margin-top: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.game-over-outcome.won  { color: #27ae60; }
+.game-over-outcome.lost { color: var(--color-text-muted); }
+
+.game-over-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.badge.elim-by {
+  border-color: transparent;
+  font-size: 0.9rem;
+}
+
 /* ── Chat ────────────────────────────────────────────────────────────────── */
 
 .chat-messages {
