@@ -16,6 +16,7 @@
     "build": "npm run build --workspace=server && npm run build --workspace=client",
     "multi-client": "scripts/multi-client.sh",
     "dev:backend": "scripts/dev-backend.sh",
-    "simulate": "ts-node --transpile-only client/scripts/simulate-game.ts"
+    "simulate": "ts-node --transpile-only client/scripts/simulate-game.ts",
+    "dev:party": "npm run dev:party --workspace=client"
   }
 }

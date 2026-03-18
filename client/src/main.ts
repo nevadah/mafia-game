@@ -6,9 +6,13 @@ app.setName('Mafia');
 
 let mainWindow: BrowserWindow | null = null;
 let client: MafiaClient | null = null;
-let pendingDeepLink: { gameId?: string; serverUrl?: string } | null = null;
+let pendingDeepLink: DeepLinkPayload | null = null;
 
-function parseJoinDeepLink(raw: string): { gameId?: string; serverUrl?: string } | null {
+export type DeepLinkPayload =
+  | { action: 'join'; gameId: string; name?: string; serverUrl?: string }
+  | { action: 'create'; name?: string; serverUrl?: string };
+
+function parseDeepLink(raw: string): DeepLinkPayload | null {
   try {
     const url = new URL(raw);
     if (url.protocol !== 'mafia:') {
@@ -16,16 +20,20 @@ function parseJoinDeepLink(raw: string): { gameId?: string; serverUrl?: string }
     }
 
     const target = (url.hostname || url.pathname.replace(/^\/+/, '')).toLowerCase();
-    if (target !== 'join') {
-      return null;
+    const name = url.searchParams.get('name') ?? undefined;
+    const serverUrl = url.searchParams.get('serverUrl') ?? undefined;
+
+    if (target === 'join') {
+      const gameId = url.searchParams.get('gameId') ?? undefined;
+      if (!gameId) return null;
+      return { action: 'join', gameId, name, serverUrl };
     }
 
-    const gameId = url.searchParams.get('gameId') ?? undefined;
-    const serverUrl = url.searchParams.get('serverUrl') ?? undefined;
-    if (!gameId) {
-      return null;
+    if (target === 'create') {
+      return { action: 'create', name, serverUrl };
     }
-    return { gameId, serverUrl };
+
+    return null;
   } catch {
     return null;
   }
@@ -35,8 +43,11 @@ function deepLinkFromArgv(argv: string[]): string | undefined {
   return argv.find((arg) => arg.startsWith('mafia://'));
 }
 
-function dispatchDeepLink(payload: { gameId?: string; serverUrl?: string }): void {
-  if (mainWindow && !mainWindow.isDestroyed()) {
+function dispatchDeepLink(payload: DeepLinkPayload): void {
+  // If the window is loaded and the renderer is ready, push immediately.
+  // Otherwise buffer — the renderer will pull via mafia:get-startup-deep-link
+  // once its useEffect has run and listeners are registered.
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoading()) {
     mainWindow.webContents.send('mafia:deep_link', payload);
   } else {
     pendingDeepLink = payload;
@@ -62,12 +73,6 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   }
-  mainWindow.webContents.on('did-finish-load', () => {
-    if (pendingDeepLink) {
-      mainWindow?.webContents.send('mafia:deep_link', pendingDeepLink);
-      pendingDeepLink = null;
-    }
-  });
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -92,7 +97,7 @@ if (!hasSingleInstanceLock) {
   app.on('second-instance', (_event, argv) => {
     const raw = deepLinkFromArgv(argv);
     if (raw) {
-      const payload = parseJoinDeepLink(raw);
+      const payload = parseDeepLink(raw);
       if (payload) {
         dispatchDeepLink(payload);
       }
@@ -108,7 +113,7 @@ if (!hasSingleInstanceLock) {
 
 app.on('open-url', (event, url) => {
   event.preventDefault();
-  const payload = parseJoinDeepLink(url);
+  const payload = parseDeepLink(url);
   if (payload) {
     dispatchDeepLink(payload);
   }
@@ -120,7 +125,7 @@ app.whenReady().then(() => {
 
   const startupLink = deepLinkFromArgv(process.argv);
   if (startupLink) {
-    const payload = parseJoinDeepLink(startupLink);
+    const payload = parseDeepLink(startupLink);
     if (payload) {
       dispatchDeepLink(payload);
     }
@@ -137,6 +142,13 @@ app.on('window-all-closed', () => {
 });
 
 // ── IPC handlers (renderer → main) ──────────────────────────────────────────
+
+// Renderer pulls this once its useEffect has run, avoiding the push-before-listen race.
+ipcMain.handle('mafia:get-startup-deep-link', () => {
+  const link = pendingDeepLink;
+  pendingDeepLink = null;
+  return link;
+});
 
 ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName: string, settings?: object) => {
   client?.disconnect();

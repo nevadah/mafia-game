@@ -27,6 +27,11 @@ npm run dev:electron --workspace=client  # terminal 2: Electron (loads from Vite
 Multiple client instances (for local multiplayer testing):
 
 ```bash
+# Option A — one command, auto-wired (recommended)
+npm run dev:backend       # terminal 1
+npm run dev:party -- 4    # terminal 2: opens 4 windows, Player1 auto-creates, rest auto-join
+
+# Option B — manual, one terminal per client
 npm run dev:backend                    # terminal 1
 npm run dev:multi --workspace=client   # terminal 2+, repeat as needed
 ```

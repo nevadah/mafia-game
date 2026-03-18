@@ -12,6 +12,7 @@
     "dev:renderer": "vite",
     "dev:electron": "npm run build:main && ELECTRON_RENDERER_URL=http://localhost:5173 electron .",
     "dev:multi": "npm run build:main && MAFIA_MULTI_INSTANCE=1 ELECTRON_RENDERER_URL=http://localhost:5173 electron .",
+    "dev:party": "npm run build:main && ts-node --transpile-only scripts/start-party.ts",
     "test": "jest --coverage",
     "test:integration": "jest --coverage --testPathPattern=integration",
     "test:renderer": "jest --config jest.renderer.config.js"

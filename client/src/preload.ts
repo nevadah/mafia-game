@@ -38,5 +38,6 @@ contextBridge.exposeInMainWorld('mafia', {
   onChatMessage: (cb: (payload: unknown) => void) =>
     ipcRenderer.on('mafia:chat_message', (_e, p) => cb(p)),
   onDeepLink: (cb: (payload: { gameId?: string; serverUrl?: string }) => void) =>
-    ipcRenderer.on('mafia:deep_link', (_e, p) => cb(p))
+    ipcRenderer.on('mafia:deep_link', (_e, p) => cb(p)),
+  getStartupDeepLink: () => ipcRenderer.invoke('mafia:get-startup-deep-link')
 });

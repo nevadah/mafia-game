@@ -89,9 +89,23 @@ export default function App() {
 
   const currentStateRef = useRef(currentState);
   const currentGameIdRef = useRef(currentGameId);
+  const pendingAutoAction = useRef(null); // { action: 'create'|'join', name, gameId }
 
   useEffect(() => { currentStateRef.current = currentState; }, [currentState]);
   useEffect(() => { currentGameIdRef.current = currentGameId; }, [currentGameId]);
+
+  // Fires after state has flushed when a deep-link with auto-submit was received.
+  useEffect(() => {
+    const pending = pendingAutoAction.current;
+    if (!pending) return;
+    if (pending.action === 'create' && playerName === pending.name) {
+      pendingAutoAction.current = null;
+      handleCreate();
+    } else if (pending.action === 'join' && playerName === pending.name && gameIdInput === pending.gameId) {
+      pendingAutoAction.current = null;
+      handleJoin();
+    }
+  }, [playerName, gameIdInput]);
 
   const me = useMemo(() => {
     if (!currentState || !currentPlayerId) return null;
@@ -244,18 +258,35 @@ export default function App() {
     window.mafia.onServerError((payload) =>
       showStatus(t('statusServerError', { message: payload?.message || 'unknown' }), true)
     );
-    window.mafia.onDeepLink((payload) => {
+    function handleDeepLink(payload) {
+      if (!payload) return;
       if (currentStateRef.current) {
         showStatus(t('statusJoinLinkBlocked'), true);
         return;
       }
-      if (payload?.serverUrl) setServerUrl(payload.serverUrl);
-      if (payload?.gameId) {
+      if (payload.serverUrl) setServerUrl(payload.serverUrl);
+
+      if (payload.action === 'create') {
+        if (payload.name) {
+          setPlayerName(payload.name);
+          pendingAutoAction.current = { action: 'create', name: payload.name };
+        }
+      } else if (payload.gameId) {
         setGameIdInput(payload.gameId);
         setJoinMode(true);
-        showStatus(t('statusJoinLinkLoaded', { gameId: payload.gameId }));
+        if (payload.name) {
+          setPlayerName(payload.name);
+          pendingAutoAction.current = { action: 'join', name: payload.name, gameId: payload.gameId };
+        } else {
+          showStatus(t('statusJoinLinkLoaded', { gameId: payload.gameId }));
+        }
       }
-    });
+    }
+
+    window.mafia.onDeepLink(handleDeepLink);
+
+    // Pull any deep link that arrived before the renderer was ready to listen.
+    window.mafia.getStartupDeepLink().then(handleDeepLink);
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────

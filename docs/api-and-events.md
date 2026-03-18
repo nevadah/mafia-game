@@ -87,5 +87,6 @@ Event subscriptions:
 
 ### Deep Link Format
 
-- `mafia://join?gameId=<id>&serverUrl=<url>`
+- `mafia://join?gameId=<id>[&name=<playerName>][&serverUrl=<url>]` — pre-fills the join form. If `name` is provided the form is submitted automatically.
+- `mafia://create[?name=<playerName>][&serverUrl=<url>]` — switches to create mode. If `name` is provided the form is submitted automatically.
 - Main process parses and forwards payload to renderer via `onDeepLink`.
