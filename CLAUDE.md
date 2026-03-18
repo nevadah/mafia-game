@@ -64,7 +64,8 @@ npm run test:renderer --workspace=client  # renderer component tests only
 | `client/src/MafiaClient.ts` | SDK over server REST + WebSocket APIs |
 | `client/src/main.ts` | Electron main process, IPC handlers, deep-link parsing |
 | `client/src/preload.ts` | `window.mafia` API exposed securely to renderer |
-| `client/renderer/src/App.jsx` | React UI for all game phases |
+| `client/renderer/src/App.jsx` | Root React component — state, WebSocket subscriptions, action handlers, component assembly |
+| `client/renderer/src/components/` | Phase components: AppHeader, EntryScreen, LobbyPhase, DayPhase, NightPhase, NightSummaryModal, GameOver, StatusBar |
 | `client/renderer/src/i18n.ts` | i18next initialization; reads saved language from localStorage |
 | `client/renderer/src/locales/` | Locale JSON files (en, de, es, fr) — add new UI strings here |
 | `client/scripts/simulate-game.ts` | Headless game simulation (spawns server, drives N clients) |
@@ -96,7 +97,7 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 2. New endpoints → `server/src/server.ts`
 3. Client SDK → `client/src/MafiaClient.ts`
 4. IPC bridge (if needed) → `client/src/main.ts`, `client/src/preload.ts`
-5. UI → `client/renderer/src/App.jsx`
+5. UI → edit or add a component in `client/renderer/src/components/`; wire it into `client/renderer/src/App.jsx` if it's a new phase-level component
 6. New UI strings → add key + English value to `client/renderer/src/locales/en.json`, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
 7. Add/update tests in the corresponding workspace `tests/` folder.
 

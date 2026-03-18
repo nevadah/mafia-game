@@ -51,6 +51,15 @@ client/
 │   │   │   ├── de.json
 │   │   │   ├── es.json
 │   │   │   └── fr.json
+│   │   ├── components/
+│   │   │   ├── AppHeader.jsx
+│   │   │   ├── EntryScreen.jsx
+│   │   │   ├── LobbyPhase.jsx
+│   │   │   ├── DayPhase.jsx
+│   │   │   ├── NightSummaryModal.jsx
+│   │   │   ├── NightPhase.jsx
+│   │   │   ├── GameOver.jsx
+│   │   │   └── StatusBar.jsx
 │   │   ├── main.jsx
 │   │   └── styles.css
 │   └── tests/
@@ -75,7 +84,8 @@ Key files:
 - `client/src/MafiaClient.ts`: SDK wrapper around server REST + WebSocket APIs.
 - `client/src/main.ts`: Electron main-process orchestration and IPC handlers.
 - `client/src/preload.ts`: safe renderer API exposed as `window.mafia`.
-- `client/renderer/src/App.jsx`: React renderer UI behavior and interaction flow.
+- `client/renderer/src/App.jsx`: Root React component — holds all game state, WebSocket subscriptions, and action handlers; assembles the UI from phase components.
+- `client/renderer/src/components/`: One component per UI concern (AppHeader, EntryScreen, LobbyPhase, DayPhase, NightPhase, NightSummaryModal, GameOver, StatusBar).
 - `client/renderer/src/i18n.ts`: i18next initialization with pre-bundled locale resources.
 - `client/renderer/src/locales/`: locale JSON files (en, de, es, fr); add new UI strings here.
 - `client/scripts/simulate-game.ts`: headless end-to-end game simulation script.

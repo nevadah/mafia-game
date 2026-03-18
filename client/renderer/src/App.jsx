@@ -2,6 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './i18n';
 
+import AppHeader       from './components/AppHeader';
+import EntryScreen     from './components/EntryScreen';
+import LobbyPhase      from './components/LobbyPhase';
+import DayPhase        from './components/DayPhase';
+import NightPhase      from './components/NightPhase';
+import GameOver        from './components/GameOver';
+import StatusBar       from './components/StatusBar';
+
+// ── Clipboard helpers ──────────────────────────────────────────────────────────
+
 function fallbackCopy(text) {
   const temp = document.createElement('textarea');
   temp.value = text;
@@ -29,10 +39,12 @@ function summarizeResult(result) {
   return Object.entries(result).map(([k, v]) => `${k}=${v}`).join(', ');
 }
 
-export default function App() {
-  const { t, i18n } = useTranslation();
+// ── App ────────────────────────────────────────────────────────────────────────
 
-  // ── Theme ──────────────────────────────────────────────────────────────────
+export default function App() {
+  const { t } = useTranslation();
+
+  // ── Theme ────────────────────────────────────────────────────────────────────
 
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem('mafia-theme');
@@ -49,24 +61,19 @@ export default function App() {
     setTheme(t => t === 'dark' ? 'light' : 'dark');
   }, []);
 
-  // ── Entry form state ───────────────────────────────────────────────────────
+  // ── Entry form state ──────────────────────────────────────────────────────────
 
   const [joinMode, setJoinMode] = useState(false);
   const [serverUrl, setServerUrl] = useState('http://localhost:3000');
   const [playerName, setPlayerName] = useState('');
   const [gameIdInput, setGameIdInput] = useState('');
 
-  // ── Game state ─────────────────────────────────────────────────────────────
+  // ── Game state ────────────────────────────────────────────────────────────────
 
   const [status, setStatus] = useState({ message: '', error: false });
   const [currentState, setCurrentState] = useState(null);
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [currentGameId, setCurrentGameId] = useState(null);
-  const [forceResolve, setForceResolve] = useState(false);
-  const [targetId, setTargetId] = useState('');
-  // Tracks which (phase, round) the current player has submitted a night action for
-  const [submittedNightKey, setSubmittedNightKey] = useState(null);
-  // Tracks which round's night summary modal has been dismissed
   const [dismissedNightSummaryRound, setDismissedNightSummaryRound] = useState(null);
 
   const currentStateRef = useRef(currentState);
@@ -82,31 +89,16 @@ export default function App() {
 
   const isHost = Boolean(currentState && currentPlayerId && currentState.hostId === currentPlayerId);
 
-  const targetCandidates = useMemo(() => {
-    if (!currentState || !me || !me.isAlive) return [];
-    if (currentState.phase === 'day') {
-      return currentState.players.filter((p) => p.isAlive && p.id !== me.id);
-    }
-    if (currentState.phase === 'night') {
-      if (me.role !== 'mafia' && me.role !== 'doctor' && me.role !== 'sheriff') return [];
-      return currentState.players.filter((p) => p.isAlive);
-    }
-    return [];
-  }, [currentState, me]);
+  const inLobby = Boolean(currentState && currentState.phase === 'lobby' && currentState.status === 'waiting');
+  const inDay   = Boolean(currentState && currentState.phase === 'day'   && currentState.status === 'active');
+  const inNight = Boolean(currentState && currentState.phase === 'night' && currentState.status === 'active');
+  const isEnded = Boolean(currentState && currentState.status === 'ended');
 
-  useEffect(() => {
-    if (!targetCandidates.length) { setTargetId(''); return; }
-    if (!targetCandidates.some((p) => p.id === targetId)) {
-      setTargetId(targetCandidates[0].id);
-    }
-  }, [targetCandidates, targetId]);
+  const canStart = isHost
+    && currentState?.players.length >= currentState?.settings?.minPlayers
+    && currentState?.readyCount === currentState?.players.length;
 
-  const inLobby  = Boolean(currentState && currentState.phase === 'lobby' && currentState.status === 'waiting');
-  const inDay    = Boolean(currentState && currentState.phase === 'day'   && currentState.status === 'active');
-  const inNight  = Boolean(currentState && currentState.phase === 'night' && currentState.status === 'active');
-  const isEnded  = Boolean(currentState && currentState.status === 'ended');
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────────
 
   function showStatus(message, error = false) {
     setStatus({ message, error });
@@ -122,7 +114,7 @@ export default function App() {
     setCurrentState(null);
     setCurrentPlayerId(null);
     setCurrentGameId(null);
-    setTargetId('');
+    setDismissedNightSummaryRound(null);
     setStatus({ message: '', error: false });
   }
 
@@ -151,6 +143,8 @@ export default function App() {
     const params = new URLSearchParams({ gameId, serverUrl: serverUrl || 'http://localhost:3000' });
     return `mafia://join?${params.toString()}`;
   }
+
+  // ── Entry handlers ────────────────────────────────────────────────────────────
 
   async function handleCreate() {
     if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
@@ -196,7 +190,29 @@ export default function App() {
     }
   }
 
-  // ── WebSocket event subscriptions ──────────────────────────────────────────
+  // ── Lobby copy handlers ───────────────────────────────────────────────────────
+
+  async function handleCopyCode() {
+    try {
+      await copyText(currentState.id);
+      showStatus(t('statusCodeCopied'));
+    } catch {
+      showStatus(t('statusCopyFailed', { code: currentState.id }), true);
+    }
+  }
+
+  async function handleCopyInviteLink() {
+    const link = buildJoinDeepLink();
+    if (!link) { showStatus(t('statusNoJoinLink'), true); return; }
+    try {
+      await copyText(link);
+      showStatus(t('statusInviteCopied'));
+    } catch {
+      showStatus(t('statusInviteFailed', { link }), true);
+    }
+  }
+
+  // ── WebSocket event subscriptions ─────────────────────────────────────────────
 
   useEffect(() => {
     window.mafia.onStateUpdate((state) => applyState(state));
@@ -231,529 +247,69 @@ export default function App() {
     });
   }, []);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  const canStart = isHost
-    && currentState?.players.length >= currentState?.settings?.minPlayers
-    && currentState?.readyCount === currentState?.players.length;
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="app">
+      <AppHeader theme={theme} onToggleTheme={toggleTheme} />
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="app-header">
-        <h1>Mafia</h1>
-        <div className="header-controls">
-          <div className="lang-switcher">
-            {['en', 'de', 'es', 'fr'].map((lang) => (
-              <button
-                key={lang}
-                className={`lang-btn${i18n.language === lang ? ' active' : ''}`}
-                onClick={() => {
-                  i18n.changeLanguage(lang);
-                  localStorage.setItem('mafia-language', lang);
-                }}
-              >
-                {lang.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <button className="theme-toggle" onClick={toggleTheme}>
-            {theme === 'dark' ? t('lightMode') : t('darkMode')}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Entry screen ───────────────────────────────────────────────────── */}
       {!currentState && (
-        <div className="entry-screen">
-          <p className="entry-subtitle">{t('entrySubtitle')}</p>
-
-          <div className="card entry-card">
-            <div className="mode-tabs">
-              <button
-                className={`mode-tab${!joinMode ? ' active' : ''}`}
-                onClick={() => setJoinMode(false)}
-              >
-                {t('newGame')}
-              </button>
-              <button
-                className={`mode-tab${joinMode ? ' active' : ''}`}
-                onClick={() => setJoinMode(true)}
-              >
-                {t('joinGame')}
-              </button>
-            </div>
-
-            <div className="field">
-              <label>{t('yourName')}</label>
-              <input
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder={t('namePlaceholder')}
-                onKeyDown={(e) => e.key === 'Enter' && (joinMode ? handleJoin() : handleCreate())}
-                autoFocus
-              />
-            </div>
-
-            {joinMode && (
-              <div className="field">
-                <label>{t('gameCodeLabel')}</label>
-                <input
-                  value={gameIdInput}
-                  onChange={(e) => setGameIdInput(e.target.value)}
-                  placeholder={t('gameCodePlaceholder')}
-                  onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                />
-              </div>
-            )}
-
-            <button className="btn-full" onClick={joinMode ? handleJoin : handleCreate}>
-              {joinMode ? t('joinGame') : t('createGame')}
-            </button>
-
-            {!joinMode && (
-              <button className="btn-full btn-secondary" onClick={handleBrowse}>
-                {t('browseGames')}
-              </button>
-            )}
-
-            <details className="advanced-section">
-              <summary>{t('advanced')}</summary>
-              <div className="field">
-                <label>{t('serverUrl')}</label>
-                <input value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} />
-              </div>
-            </details>
-          </div>
-        </div>
+        <EntryScreen
+          joinMode={joinMode} setJoinMode={setJoinMode}
+          playerName={playerName} setPlayerName={setPlayerName}
+          gameIdInput={gameIdInput} setGameIdInput={setGameIdInput}
+          serverUrl={serverUrl} setServerUrl={setServerUrl}
+          onCreate={handleCreate} onJoin={handleJoin} onBrowse={handleBrowse}
+        />
       )}
 
-      {/* ── Waiting room ───────────────────────────────────────────────────── */}
-      {currentState && inLobby && (
-        <div className="card stack">
-          <div className="lobby-header">
-            <span className="phase">{t('lobbyPhase')}</span>
-            <span className="lobby-meta">
-              {t('lobbyPlayerCount', { current: currentState.players.length, max: currentState.settings.maxPlayers })}
-              &nbsp;·&nbsp;
-              {t('readyCount', { count: currentState.readyCount })}
-            </span>
-          </div>
-
-          <div>
-            <label>{t('gameCodeLabel')}</label>
-            <div className="game-code-box">
-              <span className="game-code-value">{currentState.id}</span>
-              <div className="game-code-actions">
-                <button
-                  className="copy-btn"
-                  onClick={async () => {
-                    try { await copyText(currentState.id); showStatus(t('statusCodeCopied')); }
-                    catch { showStatus(t('statusCopyFailed', { code: currentState.id }), true); }
-                  }}
-                >
-                  {t('copyCode')}
-                </button>
-                <button
-                  className="copy-link-btn"
-                  onClick={async () => {
-                    const link = buildJoinDeepLink();
-                    if (!link) { showStatus(t('statusNoJoinLink'), true); return; }
-                    try { await copyText(link); showStatus(t('statusInviteCopied')); }
-                    catch { showStatus(t('statusInviteFailed', { link }), true); }
-                  }}
-                >
-                  {t('copyInviteLink')}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label>{t('playersLabel')}</label>
-            <div className="players">
-              {currentState.players.map((player) => (
-                <div key={player.id} className="player">
-                  <div className="player-name">{player.name}</div>
-                  <div className="badges">
-                    {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
-                    {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
-                    <span className={`badge ${player.isReady ? 'ready' : 'not-ready'}`}>
-                      {player.isReady ? t('readyBadge') : t('notReadyBadge')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="lobby-actions">
-            {!me?.isReady
-              ? <button onClick={() => runAction(t('actionMarkingReady'), window.mafia.markReady)}>{t('readyButton')}</button>
-              : <button onClick={() => runAction(t('actionMarkingUnready'), window.mafia.markUnready)}>{t('unreadyButton')}</button>
-            }
-            {isHost && (
-              <button disabled={!canStart} onClick={() => runAction(t('actionStartingGame'), window.mafia.startGame)}>
-                {t('startGame')}
-              </button>
-            )}
-            <button className="btn-secondary" onClick={handleLeave}>{t('leaveButton')}</button>
-          </div>
-
-          {isHost && !canStart && (
-            <p className="lobby-hint">
-              {currentState.players.length < currentState.settings.minPlayers
-                ? t('needMorePlayers', { count: currentState.settings.minPlayers })
-                : t('waitingForReady')}
-            </p>
-          )}
-        </div>
+      {inLobby && (
+        <LobbyPhase
+          currentState={currentState}
+          currentPlayerId={currentPlayerId}
+          me={me}
+          isHost={isHost}
+          canStart={canStart}
+          runAction={runAction}
+          onLeave={handleLeave}
+          onCopyCode={handleCopyCode}
+          onCopyInviteLink={handleCopyInviteLink}
+        />
       )}
 
-      {/* ── Day phase ──────────────────────────────────────────────────────── */}
-      {currentState && inDay && (() => {
-        const myVote = currentState.votes[currentPlayerId];
-        const pendingVoters = currentState.players.filter(
-          (p) => p.isAlive && !currentState.votes[p.id]
-        );
-        const alivePlayers = currentState.players.filter((p) => p.isAlive);
-        const deadPlayers  = currentState.players.filter((p) => !p.isAlive);
-        return (
-          <>
-            <div className="card stack">
-              <div className="day-header">
-                <span className="phase">{t('dayPhase', { round: currentState.round })}</span>
-                <span className="phase-meta">{t('dayMeta')}</span>
-              </div>
-              <p className="meta">
-                {t('playingAs')} <strong>{me?.name}</strong>
-                {me?.role && <> · {t('roleLabel')}: <strong>{me.role}</strong></>}
-                {isHost && ` · ${t('hostBadge')}`}
-              </p>
-            </div>
-
-            <div className="card stack">
-              <div className="section-heading">{t('castYourVote')}</div>
-              <div className="players">
-                {alivePlayers.map((player) => {
-                  const isMe      = player.id === currentPlayerId;
-                  const voteCount = Object.values(currentState.votes).filter((t) => t === player.id).length;
-                  const iVotedFor = myVote === player.id;
-
-                  return (
-                    <div key={player.id} className={`player${iVotedFor ? ' voted-for' : ''}`}>
-                      <div className="player-name">{player.name}</div>
-                      <div className="badges">
-                        {isMe      && <span className="badge you">{t('youBadge')}</span>}
-                        {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
-                        {!isMe && player.role && <span className="badge role-mafia">{player.role}</span>}
-                        {voteCount > 0 && (
-                          <span className="badge vote-count">
-                            {t('voteCount', { count: voteCount })}
-                          </span>
-                        )}
-                        {iVotedFor && <span className="badge your-vote">{t('yourVote')}</span>}
-                      </div>
-                      {!isMe && me?.isAlive && !myVote && (
-                        <button
-                          className="vote-btn"
-                          onClick={() => runAction(t('actionCastingVote'), () => window.mafia.castVote(player.id))}
-                        >
-                          {t('voteButton')}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {pendingVoters.length > 0 && (
-                <p className="lobby-hint">
-                  {t('waitingToVote', { names: pendingVoters.map((p) => p.name).join(', ') })}
-                </p>
-              )}
-
-              {isHost && (
-                <div className="day-controls">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={forceResolve}
-                      onChange={(e) => setForceResolve(e.target.checked)}
-                    />
-                    {t('forceResolve')}
-                  </label>
-                  <button onClick={() => runAction(t('actionResolvingDay'), () => window.mafia.resolveVotes(forceResolve))}>
-                    {t('resolveDay')}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {deadPlayers.length > 0 && (
-              <div className="card stack">
-                <div className="section-heading">{t('eliminated')}</div>
-                <div className="players">
-                  {deadPlayers.map((player) => (
-                    <div key={player.id} className="player dead">
-                      <div className="player-name">{player.name}</div>
-                      <div className="badges">
-                        <span className="badge dead">{t('eliminated')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="controls">
-              <button className="btn-secondary" onClick={handleLeave}>{t('leaveGame')}</button>
-            </div>
-          </>
-        );
-      })()}
-
-      {/* ── Night phase ────────────────────────────────────────────────────── */}
-      {currentState && inNight && (() => {
-        const nightNumber = currentState.round + 1;
-        const myRole = me?.role;
-        const nightKey = `night-${currentState.round}`;
-        const hasSubmitted = submittedNightKey === nightKey;
-
-        const nightTargets = (() => {
-          if (!me?.isAlive) return [];
-          if (myRole === 'doctor') return currentState.players.filter((p) => p.isAlive);
-          if (myRole === 'mafia' || myRole === 'sheriff') {
-            return currentState.players.filter((p) => p.isAlive && p.id !== me.id);
-          }
-          return [];
-        })();
-
-        const actionLabel = myRole === 'mafia' ? t('eliminateAction') : myRole === 'doctor' ? t('protectAction') : t('investigateAction');
-        const investigation = currentState.investigatedThisRound;
-        const investigatedPlayer = investigation
-          ? currentState.players.find((p) => p.id === investigation.target)
-          : null;
-
-        const deadPlayers = currentState.players.filter((p) => !p.isAlive);
-
-        return (
-          <>
-            <div className="card stack">
-              <div className="day-header">
-                <span className="phase">{t('nightPhase', { number: nightNumber })}</span>
-                <span className="phase-meta">
-                  {myRole === 'mafia'   && t('nightMafiaMeta')}
-                  {myRole === 'doctor'  && t('nightDoctorMeta')}
-                  {myRole === 'sheriff' && t('nightSheriffMeta')}
-                  {(!myRole || myRole === 'townsperson') && t('nightTownMeta')}
-                </span>
-              </div>
-              <p className="meta">
-                {t('playingAs')} <strong>{me?.name}</strong>
-                {myRole && <> · {t('roleLabel')}: <strong>{myRole}</strong></>}
-                {isHost && ` · ${t('hostBadge')}`}
-              </p>
-            </div>
-
-            {myRole === 'sheriff' && investigatedPlayer && (
-              <div className="card stack">
-                <div className="section-heading">{t('prevInvestigation')}</div>
-                <p className="meta">
-                  <strong>{investigatedPlayer.name}</strong>{' '}
-                  {t('investigationIs')}{' '}
-                  <strong className={investigation.result === 'mafia' ? 'role-mafia' : 'role-town'}>
-                    {t(investigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')}
-                  </strong>.
-                </p>
-              </div>
-            )}
-
-            {nightTargets.length > 0 && (
-              <div className="card stack">
-                <div className="section-heading">
-                  {myRole === 'mafia'   && t('selectEliminate')}
-                  {myRole === 'doctor'  && t('selectProtect')}
-                  {myRole === 'sheriff' && t('selectInvestigate')}
-                </div>
-                {hasSubmitted ? (
-                  <p className="lobby-hint">{t('actionSubmitted')}</p>
-                ) : (
-                  <div className="players">
-                    {nightTargets.map((player) => (
-                      <div key={player.id} className="player">
-                        <div className="player-name">{player.name}</div>
-                        <div className="badges">
-                          {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
-                          {player.role && <span className="badge role-mafia">{player.role}</span>}
-                        </div>
-                        <button
-                          className="vote-btn"
-                          onClick={() => runAction(actionLabel, async () => {
-                            const result = await window.mafia.nightAction(player.id);
-                            setSubmittedNightKey(nightKey);
-                            return result;
-                          })}
-                        >
-                          {actionLabel}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {myRole === 'townsperson' && me?.isAlive && (
-              <div className="card stack">
-                <p className="lobby-hint">{t('townSleepsHint')}</p>
-              </div>
-            )}
-
-            <div className="card stack">
-              <div className="section-heading">{t('playersLabel')}</div>
-              <div className="players">
-                {currentState.players.filter((p) => p.isAlive).map((player) => (
-                  <div key={player.id} className="player">
-                    <div className="player-name">{player.name}</div>
-                    <div className="badges">
-                      {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
-                      {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
-                      {player.id !== currentPlayerId && player.role && <span className="badge role-mafia">{player.role}</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {deadPlayers.length > 0 && (
-              <div className="card stack">
-                <div className="section-heading">{t('eliminated')}</div>
-                <div className="players">
-                  {deadPlayers.map((player) => (
-                    <div key={player.id} className="player dead">
-                      <div className="player-name">{player.name}</div>
-                      <div className="badges">
-                        <span className="badge dead">{t('eliminated')}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isHost && (
-              <div className="card stack">
-                <div className="day-controls">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={forceResolve}
-                      onChange={(e) => setForceResolve(e.target.checked)}
-                    />
-                    {t('forceResolve')}
-                  </label>
-                  <button onClick={() => runAction(t('actionResolvingNight'), () => window.mafia.resolveNight(forceResolve))}>
-                    {t('resolveNight')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="controls">
-              <button className="btn-secondary" onClick={handleLeave}>{t('leaveGame')}</button>
-            </div>
-          </>
-        );
-      })()}
-
-      {/* ── Game over ──────────────────────────────────────────────────────── */}
-      {currentState && isEnded && (
-        <>
-          <div className="card stack">
-            <div className="day-header">
-              <span className="phase">{t('gameOver')}</span>
-              <span className="phase-meta">
-                {currentState.winner === 'town' ? t('townWins') : t('mafiaWins')}
-              </span>
-            </div>
-          </div>
-
-          <div className="card stack">
-            <div className="section-heading">{t('finalStandings')}</div>
-            <div className="players">
-              {currentState.players.map((player) => (
-                <div key={player.id} className={`player${player.isAlive ? '' : ' dead'}`}>
-                  <div className="player-name">{player.name}</div>
-                  <div className="badges">
-                    {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
-                    {player.role && <span className="badge">{player.role}</span>}
-                    <span className={`badge ${player.isAlive ? 'ready' : 'dead'}`}>
-                      {player.isAlive ? t('survivedBadge') : t('eliminated')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="controls">
-            <button onClick={resetGameUi}>{t('backToMenu')}</button>
-          </div>
-        </>
+      {inDay && (
+        <DayPhase
+          currentState={currentState}
+          currentPlayerId={currentPlayerId}
+          me={me}
+          isHost={isHost}
+          dismissedNightSummaryRound={dismissedNightSummaryRound}
+          onDismissNightSummary={setDismissedNightSummaryRound}
+          runAction={runAction}
+          onLeave={handleLeave}
+        />
       )}
 
-      {/* ── Night summary modal ────────────────────────────────────────────── */}
-      {inDay && currentState.round > 0 && dismissedNightSummaryRound !== currentState.round && (() => {
-        const victim = currentState.eliminatedThisRound
-          ? currentState.players.find((p) => p.id === currentState.eliminatedThisRound)
-          : null;
-        const protected_ = currentState.doctorProtectedThisRound
-          ? currentState.players.find((p) => p.id === currentState.doctorProtectedThisRound)
-          : null;
-        const investigation = currentState.investigatedThisRound;
-        const investigatedPlayer = investigation
-          ? currentState.players.find((p) => p.id === investigation.target)
-          : null;
-
-        return (
-          <div className="night-summary-overlay">
-            <div className="night-summary-modal">
-              <div className="night-summary-title">
-                {t('nightSummaryTitle', { round: currentState.round })}
-              </div>
-              <p className={victim ? 'night-summary-kill' : 'night-summary-no-kill'}>
-                {victim
-                  ? t('nightSummaryEliminated', { name: victim.name })
-                  : t('nightSummaryNoKill')}
-              </p>
-              {me?.role === 'doctor' && protected_ && (
-                <p className="night-summary-role-note">
-                  {t('nightSummaryDoctorProtected', { name: protected_.name })}
-                </p>
-              )}
-              {me?.role === 'sheriff' && investigatedPlayer && (
-                <p className="night-summary-role-note">
-                  {t('nightSummaryInvestigated', {
-                    name: investigatedPlayer.name,
-                    result: t(investigation.result === 'mafia' ? 'investigationMafia' : 'investigationNotMafia')
-                  })}
-                </p>
-              )}
-              <button onClick={() => setDismissedNightSummaryRound(currentState.round)}>
-                {t('nightSummaryDismiss')}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Status bar ─────────────────────────────────────────────────────── */}
-      {status.message && (
-        <div className={`status${status.error ? ' error' : ''}`}>{status.message}</div>
+      {inNight && (
+        <NightPhase
+          currentState={currentState}
+          currentPlayerId={currentPlayerId}
+          me={me}
+          isHost={isHost}
+          runAction={runAction}
+          onLeave={handleLeave}
+        />
       )}
 
+      {isEnded && (
+        <GameOver
+          currentState={currentState}
+          currentPlayerId={currentPlayerId}
+          onBackToMenu={resetGameUi}
+        />
+      )}
+
+      <StatusBar message={status.message} error={status.error} />
     </div>
   );
 }
