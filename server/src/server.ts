@@ -465,14 +465,19 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
   return app;
 }
 
+export const RECONNECT_GRACE_MS = 30_000;
+
 export function createWebSocketServer(
   server: import('http').Server,
   gameManager: GameManager,
-  broadcastRef?: BroadcastRef
+  broadcastRef?: BroadcastRef,
+  gracePeriodMs: number = RECONNECT_GRACE_MS
 ): WebSocketServer {
   const wss = new WebSocketServer({ server });
 
   const clients = new Map<WebSocket, { gameId?: string; playerId?: string }>();
+  /** Pending disconnect timers keyed by "gameId:playerId". */
+  const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function broadcast(gameId: string, message: ServerToClientMessage, exclude?: WebSocket): void {
     for (const [ws, info] of clients) {
@@ -535,6 +540,13 @@ export function createWebSocketServer(
       }
 
       if (playerId) {
+        const timerKey = `${gameId}:${playerId}`;
+        const pending = disconnectTimers.get(timerKey);
+        if (pending !== undefined) {
+          clearTimeout(pending);
+          disconnectTimers.delete(timerKey);
+        }
+
         const player = game.getPlayer(playerId);
         if (player) {
           player.setConnected(true);
@@ -578,20 +590,30 @@ export function createWebSocketServer(
       clients.delete(ws);
 
       if (info?.gameId && info?.playerId) {
-        const game = gameManager.getGame(info.gameId);
-        if (game && game.getPlayer(info.playerId)) {
-          try {
-            const { deletedGame } = gameManager.leaveGame(info.gameId, info.playerId);
-            if (!deletedGame) {
-              broadcast(info.gameId, {
-                type: 'player_left',
-                payload: { playerId: info.playerId, state: game.toState() }
-              });
+        const { gameId, playerId } = info;
+        const timerKey = `${gameId}:${playerId}`;
+
+        // Don't remove immediately — give the client a window to reconnect.
+        const timer = setTimeout(() => {
+          disconnectTimers.delete(timerKey);
+          const game = gameManager.getGame(gameId);
+          if (game && game.getPlayer(playerId)) {
+            try {
+              const { deletedGame } = gameManager.leaveGame(gameId, playerId);
+              if (!deletedGame) {
+                broadcast(gameId, {
+                  type: 'player_left',
+                  payload: { playerId, state: game.toState() }
+                });
+              }
+            } catch {
+              // player or game already removed
             }
-          } catch {
-            // player or game already removed
           }
-        }
+        }, gracePeriodMs);
+
+        timer.unref();
+        disconnectTimers.set(timerKey, timer);
       }
     });
   });

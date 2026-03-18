@@ -52,8 +52,8 @@
 
 ## 6. Leave/Disconnect Flow
 
-- Disconnect (`WebSocket close`) removes player from game and sessions, same as an explicit leave. Broadcasts `player_left` to remaining players.
-- Leave (`POST /games/:gameId/leave`) removes player from game and sessions. Broadcasts `player_left` to remaining players.
+- Disconnect (`WebSocket close`) starts a 30-second grace timer. If the player reconnects within that window (using the same token), the timer is cancelled and the player remains in the game. If the timer expires, the player is removed and `player_left` is broadcast to remaining players.
+- Leave (`POST /games/:gameId/leave`) removes player from game and sessions immediately. Broadcasts `player_left` to remaining players.
 - If host leaves or disconnects, game is deleted (host migration is not implemented). No `player_left` broadcast is sent when the game is deleted.
 
 ## 7. State Visibility Rules
