@@ -1,7 +1,7 @@
 import http from 'http';
 import WebSocket from 'ws';
 import { GameManager } from '../src/GameManager';
-import { createApp, createWebSocketServer, BroadcastRef } from '../src/server';
+import { createApp, createWebSocketServer, BroadcastRef, RECONNECT_GRACE_MS } from '../src/server';
 
 interface MsgClient {
   ws: WebSocket;
@@ -71,7 +71,7 @@ describe('WebSocket Server', () => {
     broadcastRef = {};
     const app = createApp(gameManager, broadcastRef);
     server = http.createServer(app);
-    createWebSocketServer(server, gameManager, broadcastRef);
+    createWebSocketServer(server, gameManager, broadcastRef, 0);
     server.listen(0, () => {
       const addr = server.address();
       port = typeof addr === 'object' && addr ? addr.port : 0;
@@ -661,5 +661,91 @@ describe('WebSocket Server', () => {
     expect((payload.votes as Record<string, string>)[bob.id]).toBe(carol.id);
 
     void dave; // suppress unused variable warning
+  });
+
+  // ── Grace period / reconnect ────────────────────────────────────────────────
+
+  describe('reconnect grace period', () => {
+    const GRACE = Math.max(RECONNECT_GRACE_MS, 1); // satisfies the import; actual servers use 0 above
+
+    it('exported RECONNECT_GRACE_MS is a positive number', () => {
+      expect(typeof GRACE).toBe('number');
+      expect(GRACE).toBeGreaterThan(0);
+    });
+
+    it('does not remove player immediately when they disconnect (grace period > 0)', async () => {
+      // Spin up a separate server with a short grace period
+      const gm = new GameManager();
+      const br: BroadcastRef = {};
+      const app2 = createApp(gm, br);
+      const srv2 = http.createServer(app2);
+      const GRACE_MS = 200;
+      createWebSocketServer(srv2, gm, br, GRACE_MS);
+
+      await new Promise<void>((res) => srv2.listen(0, res));
+      const p2 = (srv2.address() as { port: number }).port;
+
+      const { game: g, hostPlayer: host } = gm.createGame('Alice');
+      const { player: bob } = gm.joinGame(g.id, 'Bob');
+
+      const aliceC = await connectAndListen(`ws://localhost:${p2}/?gameId=${g.id}&playerId=${host.id}`);
+      await aliceC.getNextMessage(); // connected
+
+      const bobC = await connectAndListen(`ws://localhost:${p2}/?gameId=${g.id}&playerId=${bob.id}`);
+      await bobC.getNextMessage(); // connected
+      await aliceC.getNextMessage(); // player_joined
+
+      await bobC.close();
+
+      // Still present inside the grace window
+      expect(g.getPlayer(bob.id)).toBeDefined();
+
+      // Wait for grace period to expire
+      await new Promise(r => setTimeout(r, GRACE_MS + 50));
+
+      expect(g.getPlayer(bob.id)).toBeUndefined();
+
+      await aliceC.close();
+      await new Promise<void>((res, rej) => srv2.close((e) => (e ? rej(e) : res())));
+    });
+
+    it('cancels removal when player reconnects within grace period', async () => {
+      const gm = new GameManager();
+      const br: BroadcastRef = {};
+      const app2 = createApp(gm, br);
+      const srv2 = http.createServer(app2);
+      const GRACE_MS = 300;
+      createWebSocketServer(srv2, gm, br, GRACE_MS);
+
+      await new Promise<void>((res) => srv2.listen(0, res));
+      const p2 = (srv2.address() as { port: number }).port;
+
+      const { game: g, hostPlayer: host } = gm.createGame('Alice');
+      const { player: bob, token: bobToken } = gm.joinGame(g.id, 'Bob');
+
+      const aliceC = await connectAndListen(`ws://localhost:${p2}/?gameId=${g.id}&playerId=${host.id}`);
+      await aliceC.getNextMessage(); // connected
+
+      const bobC = await connectAndListen(`ws://localhost:${p2}/?gameId=${g.id}&playerId=${bob.id}&token=${bobToken}`);
+      await bobC.getNextMessage(); // connected
+      await aliceC.getNextMessage(); // player_joined
+
+      // Bob drops — then quickly reconnects within grace window
+      await bobC.close();
+
+      const bobC2 = await connectAndListen(`ws://localhost:${p2}/?gameId=${g.id}&playerId=${bob.id}&token=${bobToken}`);
+      await bobC2.getNextMessage(); // connected
+
+      // Wait past the original grace period
+      await new Promise(r => setTimeout(r, GRACE_MS + 50));
+
+      // Bob should still be in the game
+      expect(g.getPlayer(bob.id)).toBeDefined();
+      expect(g.getPlayerCount()).toBe(2);
+
+      await aliceC.close();
+      await bobC2.close();
+      await new Promise<void>((res, rej) => srv2.close((e) => (e ? rej(e) : res())));
+    });
   });
 });

@@ -16,6 +16,8 @@ export interface MafiaClientOptions {
   fetch?: FetchLike;
   /** Injectable WebSocket factory (defaults to ws package) */
   webSocketFactory?: WebSocketFactory;
+  /** Override reconnect delay in ms (default: RECONNECT_DELAY_MS) */
+  reconnectDelayMs?: number;
 }
 
 /**
@@ -44,12 +46,18 @@ export class MafiaClient extends EventEmitter {
   private _playerId?: string;
   private _token?: string;
   private _gameState?: GameState;
+  private _intentionalDisconnect = false;
+  private _reconnectAttempts = 0;
+  private readonly _reconnectDelayMs: number;
+  static readonly MAX_RECONNECT_ATTEMPTS = 3;
+  static readonly RECONNECT_DELAY_MS = 2_000;
 
   constructor(serverUrl: string, options: MafiaClientOptions = {}) {
     super();
     const normalised = serverUrl.replace(/\/$/, '');
     this.baseUrl = normalised;
     this.wsUrl = normalised.replace(/^http/, 'ws');
+    this._reconnectDelayMs = options.reconnectDelayMs ?? MafiaClient.RECONNECT_DELAY_MS;
 
     this.fetchImpl = options.fetch ?? (globalThis as unknown as { fetch: FetchLike }).fetch;
 
@@ -367,6 +375,12 @@ export class MafiaClient extends EventEmitter {
       return Promise.reject(new Error('Join or create a game before connecting'));
     }
 
+    this._intentionalDisconnect = false;
+    this._reconnectAttempts = 0;
+    return this._openWebSocket();
+  }
+
+  private _openWebSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
       const params = new URLSearchParams();
       params.set('gameId', this._gameId!);
@@ -396,8 +410,28 @@ export class MafiaClient extends EventEmitter {
         }
       });
 
-      ws.addEventListener('error', (err?: unknown) => reject(err));
-      ws.addEventListener('close', () => this.emit('disconnected'));
+      ws.addEventListener('error', (err?: unknown) => {
+        if (!resolved) reject(err);
+      });
+
+      ws.addEventListener('close', () => {
+        if (this._intentionalDisconnect) {
+          this.emit('disconnected');
+          return;
+        }
+
+        if (this._reconnectAttempts < MafiaClient.MAX_RECONNECT_ATTEMPTS) {
+          this._reconnectAttempts++;
+          setTimeout(() => {
+            this._openWebSocket().catch(() => {
+              // If retry also fails, fall through to final disconnect below
+              // (the close handler on the new socket will decrement attempts)
+            });
+          }, this._reconnectDelayMs);
+        } else {
+          this.emit('disconnected');
+        }
+      });
     });
   }
 
@@ -405,6 +439,7 @@ export class MafiaClient extends EventEmitter {
    * Close the WebSocket connection.
    */
   disconnect(): void {
+    this._intentionalDisconnect = true;
     if (this.ws) {
       this.ws.close();
       this.ws = undefined;

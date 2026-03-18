@@ -50,6 +50,10 @@ class MockWebSocket implements WebSocketLike {
   addEventListener(type: string, listener: (e?: unknown) => void): void {
     this.handlers[type] = this.handlers[type] ?? [];
     this.handlers[type].push(listener);
+    // Simulate a failed reconnect: if already closed, fire close immediately.
+    if (type === 'close' && this.readyState === 3) {
+      listener();
+    }
   }
 
   send(data: string): void { this.sentMessages.push(data); }
@@ -69,12 +73,12 @@ function makeWsFactory(ws: MockWebSocket): WebSocketFactory {
   return (_url: string) => ws;
 }
 
-/** Helper: create a connected client */
+/** Helper: create a connected client (reconnectDelayMs defaults to 0 for fast test retries) */
 async function makeConnectedClient(stateOverrides: Partial<GameState> = {}) {
   const state = makeGameState(stateOverrides);
   const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
   const ws = new MockWebSocket();
-  const client = new MafiaClient('http://localhost:3000', { fetch, webSocketFactory: makeWsFactory(ws) });
+  const client = new MafiaClient('http://localhost:3000', { fetch, webSocketFactory: makeWsFactory(ws), reconnectDelayMs: 0 });
   await client.createGame('Alice');
   const connectPromise = client.connect();
   ws.receive({ type: 'connected', payload: { state } });
@@ -957,13 +961,12 @@ describe('MafiaClient — connect (WebSocket)', () => {
     expect(() => ws.fire('message', { data: 'not-json{' })).not.toThrow();
   });
 
-  it('emits disconnected on WebSocket close', async () => {
+  it('emits disconnected after all reconnect attempts fail', async () => {
     const { client, ws } = await makeConnectedClient();
 
-    const disconnected: boolean[] = [];
-    client.on('disconnected', () => disconnected.push(true));
+    const disconnected = new Promise<void>(resolve => client.once('disconnected', resolve));
     ws.close();
-    expect(disconnected).toHaveLength(1);
+    await disconnected; // retries exhaust (reconnectDelayMs: 0 + mock auto-closes)
   });
 
   it('rejects connect on WebSocket error', async () => {
