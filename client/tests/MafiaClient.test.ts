@@ -22,6 +22,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
     },
     readyCount: 0,
     messages: [],
+    eliminations: [],
     ...overrides
   };
 }
