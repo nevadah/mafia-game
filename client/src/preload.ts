@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld('mafia', {
     ipcRenderer.on('mafia:game_ended', (_e, p) => cb(p)),
   onServerError: (cb: (payload: unknown) => void) =>
     ipcRenderer.on('mafia:server_error', (_e, p) => cb(p)),
+  sendChat: (text: string) => ipcRenderer.invoke('mafia:send-chat', text),
+  onChatMessage: (cb: (payload: unknown) => void) =>
+    ipcRenderer.on('mafia:chat_message', (_e, p) => cb(p)),
   onDeepLink: (cb: (payload: { gameId?: string; serverUrl?: string }) => void) =>
     ipcRenderer.on('mafia:deep_link', (_e, p) => cb(p))
 });

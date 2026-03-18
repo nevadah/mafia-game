@@ -19,6 +19,13 @@ export interface GameSettings {
   hasSheriff: boolean;
 }
 
+export interface ChatMessage {
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface GameState {
   id: string;
   phase: GamePhase;
@@ -34,6 +41,7 @@ export interface GameState {
   investigatedThisRound?: { target: string; result: Role } | null;
   settings: GameSettings;
   readyCount: number;
+  messages: ChatMessage[];
 }
 
 export interface EndGameSummary {

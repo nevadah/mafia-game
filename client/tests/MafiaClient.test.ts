@@ -21,6 +21,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
       hasSheriff: true
     },
     readyCount: 0,
+    messages: [],
     ...overrides
   };
 }

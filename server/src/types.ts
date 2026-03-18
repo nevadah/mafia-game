@@ -13,6 +13,13 @@ export interface PlayerData {
   isReady: boolean;
 }
 
+export interface ChatMessage {
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface GameState {
   id: string;
   phase: GamePhase;
@@ -28,6 +35,7 @@ export interface GameState {
   investigatedThisRound?: { target: string; result: Role } | null;
   settings: GameSettings;
   readyCount: number;
+  messages: ChatMessage[];
 }
 
 export interface GameSettings {
@@ -81,6 +89,7 @@ export interface ServerToClientMessage {
     | 'vote_cast'
     | 'player_eliminated'
     | 'game_ended'
+    | 'chat_message'
     | 'error'
     | 'connected';
   payload?: unknown;

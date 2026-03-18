@@ -109,6 +109,11 @@
   "nightSummaryInvestigated": "You investigated {{name}}. They are {{result}}.",
   "nightSummaryDismiss": "Got it",
 
+  "chatHeading": "Discussion",
+  "chatPlaceholder": "Say something\u2026",
+  "chatSend": "Send",
+  "chatEmpty": "No messages yet. Start the discussion!",
+
   "actionMarkingReady": "Marking ready",
   "actionMarkingUnready": "Marking unready",
   "actionStartingGame": "Starting game",

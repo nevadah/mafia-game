@@ -27,6 +27,7 @@ const mockMafia = {
   nightAction: jest.fn(),
   resolveVotes: jest.fn(),
   resolveNight: jest.fn(),
+  sendChat: jest.fn(),
   leaveGame: jest.fn(),
   disconnect: jest.fn()
 };
@@ -57,6 +58,7 @@ function makeDayState(overrides = {}) {
     eliminatedThisRound: undefined,
     settings: BASE_SETTINGS,
     readyCount: 3,
+    messages: [],
     ...overrides
   };
 }
@@ -335,5 +337,95 @@ describe('App — day phase state updates', () => {
 
     const bobCard = screen.getByText('Bob').closest('.player');
     expect(within(bobCard).getByText('1 vote')).toBeInTheDocument();
+  });
+});
+
+// ── Chat panel ────────────────────────────────────────────────────────────────
+
+describe('App — day phase chat panel', () => {
+  it('shows the Discussion section heading', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState());
+    expect(screen.getByText('Discussion')).toBeInTheDocument();
+  });
+
+  it('shows empty state message when there are no messages', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState({ messages: [] }));
+    expect(screen.getByText(/No messages yet/i)).toBeInTheDocument();
+  });
+
+  it('renders existing messages from state', async () => {
+    const user = userEvent.setup();
+    const messages = [
+      { senderId: 'p2', senderName: 'Bob', text: 'I think it is Alice', timestamp: 1 },
+      { senderId: 'p3', senderName: 'Carol', text: 'No way', timestamp: 2 }
+    ];
+    await enterDayPhase(user, makeDayState({ messages }));
+    expect(screen.getByText('I think it is Alice')).toBeInTheDocument();
+    expect(screen.getByText('No way')).toBeInTheDocument();
+  });
+
+  it('shows chat input for alive players', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState()); // Alice (p1) is alive
+    expect(screen.getByPlaceholderText(/Say something/i)).toBeInTheDocument();
+  });
+
+  it('Send button is disabled when input is empty', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState());
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+  });
+
+  it('Send button is enabled when input has text', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState());
+    await user.type(screen.getByPlaceholderText(/Say something/i), 'Hello');
+    expect(screen.getByRole('button', { name: 'Send' })).not.toBeDisabled();
+  });
+
+  it('calls sendChat and clears input when Send is clicked', async () => {
+    const user = userEvent.setup();
+    mockMafia.sendChat.mockResolvedValue({});
+    await enterDayPhase(user, makeDayState());
+    await user.type(screen.getByPlaceholderText(/Say something/i), 'Hello everyone');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    expect(mockMafia.sendChat).toHaveBeenCalledWith('Hello everyone');
+    expect(screen.getByPlaceholderText(/Say something/i)).toHaveValue('');
+  });
+
+  it('calls sendChat when Enter is pressed in the chat input', async () => {
+    const user = userEvent.setup();
+    mockMafia.sendChat.mockResolvedValue({});
+    await enterDayPhase(user, makeDayState());
+    await user.type(screen.getByPlaceholderText(/Say something/i), 'Quick message{Enter}');
+    expect(mockMafia.sendChat).toHaveBeenCalledWith('Quick message');
+  });
+
+  it('does not show chat input for dead players', async () => {
+    const user = userEvent.setup();
+    // Join as p4 (Dave) who is dead
+    const state = makeDayState();
+    mockMafia.joinGame.mockResolvedValue({ playerId: 'p4', gameId: 'game-1', state });
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Join Game' }));
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Dave');
+    await user.type(screen.getByPlaceholderText('Enter game code'), 'game-1');
+    await user.click(document.querySelector('.btn-full'));
+    expect(screen.queryByPlaceholderText(/Say something/i)).not.toBeInTheDocument();
+  });
+
+  it('updates chat panel when state_update arrives with new messages', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState({ messages: [] }));
+
+    const updatedState = makeDayState({
+      messages: [{ senderId: 'p2', senderName: 'Bob', text: 'New message!', timestamp: 1 }]
+    });
+    const stateUpdateCallback = mockMafia.onStateUpdate.mock.calls[0][0];
+    act(() => stateUpdateCallback(updatedState));
+
+    expect(screen.getByText('New message!')).toBeInTheDocument();
   });
 });

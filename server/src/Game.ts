@@ -5,6 +5,7 @@ import {
   GameStatus,
   GameState,
   GameSettings,
+  ChatMessage,
   Role
 } from './types';
 
@@ -29,6 +30,7 @@ export class Game {
   private eliminatedThisRound?: string;
   private doctorProtectedThisRound?: string;
   private investigatedThisRound?: { target: string; result: Role } | null;
+  private messages: ChatMessage[];
   readonly settings: GameSettings;
   private readonly createdAt: number;
   private updatedAt: number;
@@ -42,6 +44,7 @@ export class Game {
     this.round = 0;
     this.votes = new Map();
     this.nightActions = new Map();
+    this.messages = [];
     this.settings = { ...DEFAULT_SETTINGS, ...settings };
     this.createdAt = Date.now();
     this.updatedAt = this.createdAt;
@@ -285,6 +288,38 @@ export class Game {
     return eliminated;
   }
 
+  // ── Chat ───────────────────────────────────────────────────────────────────
+
+  addChatMessage(playerId: string, text: string): ChatMessage {
+    if (this.phase !== 'day') {
+      throw new Error('Chat is only allowed during the day phase');
+    }
+    const player = this.players.get(playerId);
+    if (!player || !player.isAlive) {
+      throw new Error('Only alive players can send chat messages');
+    }
+    const trimmed = text.trim();
+    if (!trimmed) {
+      throw new Error('Message cannot be empty');
+    }
+    if (trimmed.length > 200) {
+      throw new Error('Message cannot exceed 200 characters');
+    }
+    const message: ChatMessage = {
+      senderId: playerId,
+      senderName: player.name,
+      text: trimmed,
+      timestamp: Date.now()
+    };
+    this.messages.push(message);
+    this.touch();
+    return message;
+  }
+
+  getMessages(): ChatMessage[] {
+    return [...this.messages];
+  }
+
   // ── Night phase ────────────────────────────────────────────────────────────
 
   submitNightAction(playerId: string, targetId: string): void {
@@ -480,7 +515,8 @@ export class Game {
         ? (this.investigatedThisRound ?? null)
         : null,
       settings: this.settings,
-      readyCount: this.getReadyCount()
+      readyCount: this.getReadyCount(),
+      messages: this.getMessages()
     };
   }
 }

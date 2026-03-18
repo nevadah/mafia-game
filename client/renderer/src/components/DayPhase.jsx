@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import NightSummaryModal from './NightSummaryModal';
 
@@ -9,6 +9,14 @@ export default function DayPhase({
 }) {
   const { t } = useTranslation();
   const [forceResolve, setForceResolve] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef(null);
+
+  const messages = currentState.messages ?? [];
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
+  }, [messages.length]);
 
   const myVote = currentState.votes[currentPlayerId];
   const pendingVoters = currentState.players.filter(
@@ -112,6 +120,53 @@ export default function DayPhase({
           </div>
         </div>
       )}
+
+      <div className="card stack">
+        <div className="section-heading">{t('chatHeading')}</div>
+        <div className="chat-messages">
+          {messages.length === 0
+            ? <p className="chat-empty">{t('chatEmpty')}</p>
+            : messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`chat-message${msg.senderId === currentPlayerId ? ' chat-message-mine' : ''}`}
+              >
+                <span className="chat-sender">{msg.senderName}</span>
+                <span className="chat-text">{msg.text}</span>
+              </div>
+            ))
+          }
+          <div ref={chatEndRef} />
+        </div>
+        {me?.isAlive && (
+          <div className="chat-input-row">
+            <input
+              className="chat-input"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && chatInput.trim()) {
+                  runAction('', () => window.mafia.sendChat(chatInput.trim()));
+                  setChatInput('');
+                }
+              }}
+              placeholder={t('chatPlaceholder')}
+              maxLength={200}
+            />
+            <button
+              className="chat-send-btn"
+              disabled={!chatInput.trim()}
+              onClick={() => {
+                if (!chatInput.trim()) return;
+                runAction('', () => window.mafia.sendChat(chatInput.trim()));
+                setChatInput('');
+              }}
+            >
+              {t('chatSend')}
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="controls">
         <button className="btn-secondary" onClick={onLeave}>{t('leaveGame')}</button>

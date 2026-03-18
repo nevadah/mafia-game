@@ -109,6 +109,11 @@
   "nightSummaryInvestigated": "Investigaste a {{name}}. Son {{result}}.",
   "nightSummaryDismiss": "Entendido",
 
+  "chatHeading": "Discusi\u00f3n",
+  "chatPlaceholder": "Di algo\u2026",
+  "chatSend": "Enviar",
+  "chatEmpty": "A\u00fan no hay mensajes. \u00a1Inicia la discusi\u00f3n!",
+
   "actionMarkingReady": "Marcando listo",
   "actionMarkingUnready": "Marcando no listo",
   "actionStartingGame": "Iniciando juego",
