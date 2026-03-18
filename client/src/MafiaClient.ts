@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { GameState, EndGameSummary, Role, ServerMessage, FetchLike } from './types';
+import { GameState, ChatMessage, EndGameSummary, Role, ServerMessage, FetchLike } from './types';
 
 export type WebSocketLike = {
   readyState: number;
@@ -284,6 +284,25 @@ export class MafiaClient extends EventEmitter {
   }
 
   /**
+   * Send a chat message during the day phase.
+   */
+  async sendChat(text: string): Promise<ChatMessage> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json() as { message: ChatMessage; state: GameState };
+    this._gameState = data.state;
+    return data.message;
+  }
+
+  /**
    * Leave the current game.
    */
   async leaveGame(): Promise<{ deletedGame: boolean }> {
@@ -442,6 +461,18 @@ export class MafiaClient extends EventEmitter {
           this.emit('state_update', this._gameState);
         }
         this.emit(msg.type, msg.payload);
+        break;
+      }
+      case 'chat_message': {
+        const p = msg.payload as ChatMessage | undefined;
+        if (p && this._gameState) {
+          this._gameState = {
+            ...this._gameState,
+            messages: [...(this._gameState.messages ?? []), p]
+          };
+          this.emit('state_update', this._gameState);
+        }
+        this.emit('chat_message', msg.payload);
         break;
       }
       case 'error':

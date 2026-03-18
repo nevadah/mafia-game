@@ -109,6 +109,11 @@
   "nightSummaryInvestigated": "Du hast {{name}} untersucht. Sie sind {{result}}.",
   "nightSummaryDismiss": "Verstanden",
 
+  "chatHeading": "Diskussion",
+  "chatPlaceholder": "Etwas sagen\u2026",
+  "chatSend": "Senden",
+  "chatEmpty": "Noch keine Nachrichten. Starte die Diskussion!",
+
   "actionMarkingReady": "Bereit markieren",
   "actionMarkingUnready": "Nicht bereit markieren",
   "actionStartingGame": "Starte Spiel",

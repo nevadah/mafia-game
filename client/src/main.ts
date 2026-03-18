@@ -81,6 +81,7 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('game_started', (p) => mainWindow?.webContents.send('mafia:game_started', p));
   c.on('game_ended', (p) => mainWindow?.webContents.send('mafia:game_ended', p));
   c.on('server_error', (p) => mainWindow?.webContents.send('mafia:server_error', p));
+  c.on('chat_message', (p) => mainWindow?.webContents.send('mafia:chat_message', p));
 }
 
 const multiInstance = Boolean(process.env.MAFIA_MULTI_INSTANCE);
@@ -200,6 +201,11 @@ ipcMain.handle('mafia:resolve-votes', async (_event, force?: boolean) => {
 ipcMain.handle('mafia:resolve-night', async (_event, force?: boolean) => {
   if (!client) throw new Error('Not connected to a game');
   return client.resolveNight(Boolean(force));
+});
+
+ipcMain.handle('mafia:send-chat', async (_event, text: string) => {
+  if (!client) throw new Error('Not connected to a game');
+  return client.sendChat(text);
 });
 
 ipcMain.handle('mafia:leave-game', async () => {

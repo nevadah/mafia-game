@@ -465,4 +465,65 @@ describe('REST API', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('POST /games/:gameId/chat', () => {
+    async function setupDayGame() {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId: hostId } = createRes.body;
+      const joinedIds: string[] = [];
+      for (const name of ['Bob', 'Carol', 'Dave']) {
+        const r = await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
+        joinedIds.push(r.body.playerId);
+      }
+      await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      // Force advance to day phase
+      await request(app).post(`/games/${gameId}/resolve-night`).send({ playerId: hostId, force: true });
+      return { gameId, hostId, playerIds: [hostId, ...joinedIds] };
+    }
+
+    it('adds a chat message and returns it', async () => {
+      const { gameId, hostId } = await setupDayGame();
+      const res = await request(app)
+        .post(`/games/${gameId}/chat`)
+        .send({ playerId: hostId, text: 'Hello everyone!' });
+      expect(res.status).toBe(200);
+      expect(res.body.message.text).toBe('Hello everyone!');
+      expect(res.body.message.senderId).toBe(hostId);
+      expect(res.body.message.senderName).toBe('Alice');
+    });
+
+    it('includes the message in subsequent game state', async () => {
+      const { gameId, hostId } = await setupDayGame();
+      await request(app)
+        .post(`/games/${gameId}/chat`)
+        .send({ playerId: hostId, text: 'Test message' });
+      const stateRes = await request(app).get(`/games/${gameId}`);
+      expect(stateRes.body.state.messages).toHaveLength(1);
+      expect(stateRes.body.state.messages[0].text).toBe('Test message');
+    });
+
+    it('returns 400 for missing text', async () => {
+      const { gameId, hostId } = await setupDayGame();
+      const res = await request(app)
+        .post(`/games/${gameId}/chat`)
+        .send({ playerId: hostId });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when not in day phase', async () => {
+      // Game is still in lobby (before start)
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId: hostId } = createRes.body;
+      const res = await request(app)
+        .post(`/games/${gameId}/chat`)
+        .send({ playerId: hostId, text: 'hi' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/day phase/i);
+    });
+
+    it('returns 404 for unknown game', async () => {
+      const res = await request(app).post('/games/unknown/chat').send({ text: 'hi' });
+      expect(res.status).toBe(404);
+    });
+  });
 });

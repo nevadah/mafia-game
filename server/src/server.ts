@@ -270,6 +270,31 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
   });
 
+  // ── POST /games/:gameId/chat ──────────────────────────────────────────────
+  app.post('/games/:gameId/chat', (req: Request, res: Response) => {
+    const game = gameManager.getGame(req.params.gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    try {
+      const { text, playerId } = req.body as { text?: string; playerId?: string };
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'text is required' });
+      }
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const message = game.addChatMessage(actorId, text);
+      broadcast(game.id, {
+        type: 'chat_message',
+        payload: message
+      });
+      return res.json({ message, state: game.toState(actorId) });
+    } catch (err) {
+      const status = err instanceof HttpError ? err.status : 400;
+      return res.status(status).json({ error: (err as Error).message });
+    }
+  });
+
   // ── POST /games/:gameId/resolve-votes ─────────────────────────────────────
   app.post('/games/:gameId/resolve-votes', (req: Request, res: Response) => {
     const game = gameManager.getGame(req.params.gameId);

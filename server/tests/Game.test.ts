@@ -579,6 +579,93 @@ describe('Game', () => {
     });
   });
 
+  // ── Chat ──────────────────────────────────────────────────────────────────
+
+  describe('addChatMessage', () => {
+    it('adds a message during day phase and returns it', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase(); // night → day
+      const msg = game.addChatMessage(players[0].id, 'Hello!');
+      expect(msg.senderId).toBe(players[0].id);
+      expect(msg.senderName).toBe(players[0].name);
+      expect(msg.text).toBe('Hello!');
+      expect(typeof msg.timestamp).toBe('number');
+    });
+
+    it('trims whitespace from message text', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      const msg = game.addChatMessage(players[0].id, '  hi  ');
+      expect(msg.text).toBe('hi');
+    });
+
+    it('includes messages in toState()', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      game.addChatMessage(players[0].id, 'Hello!');
+      const state = game.toState();
+      expect(state.messages).toHaveLength(1);
+      expect(state.messages[0].text).toBe('Hello!');
+    });
+
+    it('accumulates multiple messages in order', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      game.addChatMessage(players[0].id, 'First');
+      game.addChatMessage(players[1].id, 'Second');
+      expect(game.toState().messages).toHaveLength(2);
+      expect(game.toState().messages[0].text).toBe('First');
+      expect(game.toState().messages[1].text).toBe('Second');
+    });
+
+    it('throws when not in day phase (night)', () => {
+      const { game, players } = makeGame(4);
+      game.start(); // night
+      expect(() => game.addChatMessage(players[0].id, 'hi')).toThrow(
+        'Chat is only allowed during the day phase'
+      );
+    });
+
+    it('throws when not in day phase (lobby)', () => {
+      const { game, players } = makeGame(4);
+      expect(() => game.addChatMessage(players[0].id, 'hi')).toThrow(
+        'Chat is only allowed during the day phase'
+      );
+    });
+
+    it('throws for a dead player', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      players[1].eliminate();
+      expect(() => game.addChatMessage(players[1].id, 'hi')).toThrow(
+        'Only alive players can send chat messages'
+      );
+    });
+
+    it('throws for an empty message', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      expect(() => game.addChatMessage(players[0].id, '   ')).toThrow(
+        'Message cannot be empty'
+      );
+    });
+
+    it('throws when message exceeds 200 characters', () => {
+      const { game, players } = makeGame(4);
+      game.start();
+      game.advancePhase();
+      expect(() => game.addChatMessage(players[0].id, 'a'.repeat(201))).toThrow(
+        'Message cannot exceed 200 characters'
+      );
+    });
+  });
+
   // ── Win conditions ─────────────────────────────────────────────────────────
 
   describe('checkWinCondition', () => {
