@@ -137,12 +137,12 @@ app.on('window-all-closed', () => {
 
 // ── IPC handlers (renderer → main) ──────────────────────────────────────────
 
-ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName: string) => {
+ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName: string, settings?: object) => {
   client?.disconnect();
   client = new MafiaClient(serverUrl);
   attachClientEvents(client);
 
-  const state = await client.createGame(playerName);
+  const state = await client.createGame(playerName, settings);
   await client.connect();
   return { state, playerId: client.playerId, gameId: client.gameId };
 });

@@ -13,6 +13,12 @@
   "browseGames": "Spiele suchen",
   "advanced": "Erweitert",
   "serverUrl": "Server-URL",
+  "gameSettings": "Spieleinstellungen",
+  "minPlayers": "Mindestspielerzahl",
+  "maxPlayers": "Maximalspielerzahl",
+  "mafiaRatio": "Mafia-Anteil",
+  "hasDoctor": "Arzt-Rolle",
+  "hasSheriff": "Sheriff-Rolle",
 
   "lobbyPhase": "Lobby",
   "lobbyPlayerCount": "{{current}} / {{max}} Spieler",

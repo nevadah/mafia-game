@@ -67,6 +67,17 @@ export default function App() {
   const [serverUrl, setServerUrl] = useState('http://localhost:3000');
   const [playerName, setPlayerName] = useState('');
   const [gameIdInput, setGameIdInput] = useState('');
+  const [gameSettings, setGameSettings] = useState({
+    minPlayers: 4,
+    maxPlayers: 12,
+    mafiaRatio: 0.25,
+    hasDoctor: true,
+    hasSheriff: true
+  });
+
+  function handleSettingChange(key, value) {
+    setGameSettings((prev) => ({ ...prev, [key]: value }));
+  }
 
   // ── Game state ────────────────────────────────────────────────────────────────
 
@@ -150,7 +161,7 @@ export default function App() {
     if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
     try {
       showStatus(t('statusCreatingGame'));
-      const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim());
+      const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim(), gameSettings);
       onConnected(result);
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
@@ -259,6 +270,7 @@ export default function App() {
           playerName={playerName} setPlayerName={setPlayerName}
           gameIdInput={gameIdInput} setGameIdInput={setGameIdInput}
           serverUrl={serverUrl} setServerUrl={setServerUrl}
+          settings={gameSettings} onSettingChange={handleSettingChange}
           onCreate={handleCreate} onJoin={handleJoin} onBrowse={handleBrowse}
         />
       )}

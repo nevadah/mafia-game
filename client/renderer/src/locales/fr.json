@@ -13,6 +13,12 @@
   "browseGames": "Parcourir les parties",
   "advanced": "Avancé",
   "serverUrl": "URL du serveur",
+  "gameSettings": "Paramètres de jeu",
+  "minPlayers": "Joueurs minimum",
+  "maxPlayers": "Joueurs maximum",
+  "mafiaRatio": "Ratio mafia",
+  "hasDoctor": "Rôle médecin",
+  "hasSheriff": "Rôle shérif",
 
   "lobbyPhase": "Lobby",
   "lobbyPlayerCount": "{{current}} / {{max}} joueurs",

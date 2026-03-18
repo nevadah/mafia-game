@@ -359,6 +359,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   color: var(--color-text);
 }
 
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.settings-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 /* ── Waiting room ────────────────────────────────────────────────────────── */
 
 .lobby-header {

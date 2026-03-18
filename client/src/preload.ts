@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('mafia', {
-  createGame: (serverUrl: string, playerName: string) =>
-    ipcRenderer.invoke('mafia:create-game', serverUrl, playerName),
+  createGame: (serverUrl: string, playerName: string, settings?: object) =>
+    ipcRenderer.invoke('mafia:create-game', serverUrl, playerName, settings),
   joinGame: (serverUrl: string, gameId: string, playerName: string) =>
     ipcRenderer.invoke('mafia:join-game', serverUrl, gameId, playerName),
   getState: () => ipcRenderer.invoke('mafia:get-state'),
