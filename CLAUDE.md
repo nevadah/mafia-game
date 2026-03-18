@@ -33,7 +33,10 @@ npm run dev:electron --workspace=client
 # Start server + Vite renderer dev server together (recommended before launching clients)
 npm run dev:backend
 
-# Run multiple independent client instances (for local multiplayer testing)
+# Auto-launch N pre-wired players (recommended for local multiplayer testing)
+npm run dev:party -- 4    # opens 4 windows; Player1 auto-creates, rest auto-join
+
+# Run independent client instances manually (one terminal per player)
 npm run dev:multi --workspace=client   # repeat in as many terminals as needed
 
 # Headless end-to-end simulation (no UI required)
