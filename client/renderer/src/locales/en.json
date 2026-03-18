@@ -13,6 +13,12 @@
   "browseGames": "Browse Waiting Games",
   "advanced": "Advanced",
   "serverUrl": "Server URL",
+  "gameSettings": "Game Settings",
+  "minPlayers": "Min players",
+  "maxPlayers": "Max players",
+  "mafiaRatio": "Mafia ratio",
+  "hasDoctor": "Doctor role",
+  "hasSheriff": "Sheriff role",
 
   "lobbyPhase": "Lobby",
   "lobbyPlayerCount": "{{current}} / {{max}} players",

@@ -160,3 +160,78 @@ describe('App — deep link handling', () => {
     expect(screen.getByText(/Join link loaded for game abc123/)).toBeInTheDocument();
   });
 });
+
+// ── Game settings form ────────────────────────────────────────────────────────
+
+describe('App — game settings', () => {
+  it('shows Game Settings section in New Game mode', () => {
+    render(<App />);
+    expect(screen.getByText('Game Settings')).toBeInTheDocument();
+  });
+
+  it('does not show Game Settings section in Join Game mode', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Join Game' }));
+    expect(screen.queryByText('Game Settings')).not.toBeInTheDocument();
+  });
+
+  it('min players input has default value of 4', () => {
+    render(<App />);
+    const details = screen.getByText('Game Settings').closest('details');
+    details.open = true;
+    expect(within(details).getByDisplayValue('4')).toBeInTheDocument();
+  });
+
+  it('max players input has default value of 12', () => {
+    render(<App />);
+    const details = screen.getByText('Game Settings').closest('details');
+    details.open = true;
+    expect(within(details).getByDisplayValue('12')).toBeInTheDocument();
+  });
+
+  it('Doctor role checkbox is checked by default', () => {
+    render(<App />);
+    const details = screen.getByText('Game Settings').closest('details');
+    details.open = true;
+    expect(within(details).getByLabelText('Doctor role')).toBeChecked();
+  });
+
+  it('Sheriff role checkbox is checked by default', () => {
+    render(<App />);
+    const details = screen.getByText('Game Settings').closest('details');
+    details.open = true;
+    expect(within(details).getByLabelText('Sheriff role')).toBeChecked();
+  });
+
+  it('passes settings to createGame when creating a game', async () => {
+    const user = userEvent.setup();
+    mockMafia.createGame.mockResolvedValue({
+      playerId: 'p1',
+      gameId: 'g1',
+      state: { id: 'g1', phase: 'lobby', status: 'waiting', players: [], hostId: 'p1', settings: {}, readyCount: 0 }
+    });
+
+    render(<App />);
+
+    const details = screen.getByText('Game Settings').closest('details');
+    details.open = true;
+
+    // Change min players to 6
+    const minInput = within(details).getByDisplayValue('4');
+    await user.clear(minInput);
+    await user.type(minInput, '6');
+
+    // Uncheck Doctor role
+    await user.click(within(details).getByLabelText('Doctor role'));
+
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.click(screen.getByRole('button', { name: 'Create Game' }));
+
+    expect(mockMafia.createGame).toHaveBeenCalledWith(
+      'http://localhost:3000',
+      'Alice',
+      expect.objectContaining({ minPlayers: 6, hasDoctor: false })
+    );
+  });
+});
