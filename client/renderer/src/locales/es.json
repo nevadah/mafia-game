@@ -131,5 +131,17 @@
   "actionStartingGame": "Iniciando juego",
   "actionCastingVote": "Emitiendo voto",
   "actionResolvingDay": "Resolviendo el día",
-  "actionResolvingNight": "Resolviendo la noche"
+  "actionResolvingNight": "Resolviendo la noche",
+
+  "spectateGame": "Espectar",
+  "spectatingBadge": "Espectador",
+  "spectatorsLabel": "Espectadores",
+  "spectatorCount_one": "{{count}} espectador",
+  "spectatorCount_other": "{{count}} espectadores",
+  "copySpectateLink": "Copiar enlace de espectador",
+  "spectatingContext": "Modo espectador",
+  "statusSpectatingGame": "Uniéndose como espectador...",
+  "statusSpectateLinkLoaded": "Enlace de espectador cargado para el juego {{gameId}}.",
+  "statusSpectateCopied": "Enlace de espectador copiado.",
+  "statusNoSpectateLink": "No hay enlace de espectador disponible."
 }

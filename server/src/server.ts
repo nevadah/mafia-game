@@ -9,6 +9,7 @@ import {
   NightActionRequest,
   ReadyRequest,
   LeaveRequest,
+  SpectateRequest,
   ServerToClientMessage
 } from './types';
 
@@ -57,6 +58,9 @@ function resolveActorPlayerId(
     }
     if (session.gameId !== gameId) {
       throw new HttpError(403, 'Token does not match this game');
+    }
+    if (session.isSpectator) {
+      throw new HttpError(403, 'Spectators cannot perform player actions');
     }
     if (fallbackPlayerId && fallbackPlayerId !== session.playerId) {
       throw new HttpError(403, 'playerId does not match authenticated player');
@@ -156,6 +160,32 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
         playerId: player.id,
         token,
         state: game.toState(player.id)
+      });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === 'Game not found') {
+        return res.status(404).json({ error: message });
+      }
+      return res.status(400).json({ error: message });
+    }
+  });
+
+  // ── POST /games/:gameId/spectate ──────────────────────────────────────────
+  app.post('/games/:gameId/spectate', (req: Request, res: Response) => {
+    const { spectatorName } = req.body as SpectateRequest;
+    if (!spectatorName || typeof spectatorName !== 'string' || spectatorName.trim() === '') {
+      return res.status(400).json({ error: 'spectatorName is required' });
+    }
+    try {
+      const { game, spectatorId, token } = gameManager.joinAsSpectator(req.params.gameId, spectatorName.trim());
+      broadcast(game.id, {
+        type: 'spectator_joined',
+        payload: { spectatorId, spectatorName: spectatorName.trim(), state: game.toState() }
+      });
+      return res.status(200).json({
+        spectatorId,
+        token,
+        state: game.toState()
       });
     } catch (err) {
       const message = (err as Error).message;
@@ -475,7 +505,7 @@ export function createWebSocketServer(
 ): WebSocketServer {
   const wss = new WebSocketServer({ server });
 
-  const clients = new Map<WebSocket, { gameId?: string; playerId?: string }>();
+  const clients = new Map<WebSocket, { gameId?: string; playerId?: string; isSpectator?: boolean }>();
   /** Pending disconnect timers keyed by "gameId:playerId". */
   const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -492,8 +522,12 @@ export function createWebSocketServer(
     broadcastRef.broadcast = (gameId, msg) => broadcast(gameId, msg);
     broadcastRef.broadcastPerPlayer = (gameId, makeMsg) => {
       for (const [ws, info] of clients) {
-        if (info.gameId === gameId && info.playerId && ws.readyState === WebSocket.OPEN) {
+        if (info.gameId !== gameId || ws.readyState !== WebSocket.OPEN) continue;
+        if (info.playerId && !info.isSpectator) {
           ws.send(JSON.stringify(makeMsg(info.playerId)));
+        } else if (info.isSpectator) {
+          // Spectators get the public state (no player-specific visibility)
+          ws.send(JSON.stringify(makeMsg('')));
         }
       }
     };
@@ -504,6 +538,7 @@ export function createWebSocketServer(
     let gameId = url.searchParams.get('gameId') ?? undefined;
     let playerId = url.searchParams.get('playerId') ?? undefined;
     const token = url.searchParams.get('token') ?? undefined;
+    let isSpectator = false;
 
     if (token) {
       const session = gameManager.getSession(token);
@@ -527,9 +562,10 @@ export function createWebSocketServer(
 
       gameId = session.gameId;
       playerId = session.playerId;
+      isSpectator = session.isSpectator;
     }
 
-    clients.set(ws, { gameId, playerId });
+    clients.set(ws, { gameId, playerId, isSpectator });
 
     if (gameId) {
       const game = gameManager.getGame(gameId);
@@ -547,20 +583,24 @@ export function createWebSocketServer(
           disconnectTimers.delete(timerKey);
         }
 
-        const player = game.getPlayer(playerId);
-        if (player) {
-          player.setConnected(true);
+        if (isSpectator) {
+          game.setSpectatorConnected(playerId, true);
+        } else {
+          const player = game.getPlayer(playerId);
+          if (player) {
+            player.setConnected(true);
+          }
         }
       }
 
       ws.send(
         JSON.stringify({
           type: 'connected',
-          payload: { state: game.toState(playerId) }
+          payload: { state: game.toState(isSpectator ? undefined : playerId) }
         })
       );
 
-      if (playerId) {
+      if (playerId && !isSpectator) {
         broadcast(gameId, {
           type: 'player_joined',
           payload: { playerId, state: game.toState() }
@@ -590,14 +630,28 @@ export function createWebSocketServer(
       clients.delete(ws);
 
       if (info?.gameId && info?.playerId) {
-        const { gameId, playerId } = info;
+        const { gameId, playerId, isSpectator } = info;
         const timerKey = `${gameId}:${playerId}`;
 
         // Don't remove immediately — give the client a window to reconnect.
         const timer = setTimeout(() => {
           disconnectTimers.delete(timerKey);
           const game = gameManager.getGame(gameId);
-          if (game && game.getPlayer(playerId)) {
+          if (!game) return;
+
+          if (isSpectator) {
+            if (game.getSpectator(playerId)) {
+              try {
+                gameManager.leaveSpectator(gameId, playerId);
+                broadcast(gameId, {
+                  type: 'spectator_left',
+                  payload: { spectatorId: playerId, state: game.toState() }
+                });
+              } catch {
+                // spectator or game already removed
+              }
+            }
+          } else if (game.getPlayer(playerId)) {
             try {
               const { deletedGame } = gameManager.leaveGame(gameId, playerId);
               if (!deletedGame) {

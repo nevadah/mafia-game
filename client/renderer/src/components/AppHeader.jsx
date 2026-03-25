@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 const LANGS = ['en', 'de', 'es', 'fr'];
 
-export default function AppHeader({ theme, onToggleTheme }) {
+export default function AppHeader({ theme, onToggleTheme, isSpectator }) {
   const { t, i18n } = useTranslation();
 
   function handleLangChange(lang) {
@@ -12,7 +12,7 @@ export default function AppHeader({ theme, onToggleTheme }) {
 
   return (
     <div className="app-header">
-      <h1>Mafia</h1>
+      <h1>Mafia{isSpectator && <span className="badge spectating">{t('spectatingBadge')}</span>}</h1>
       <div className="header-controls">
         <div className="lang-switcher">
           {LANGS.map((lang) => (

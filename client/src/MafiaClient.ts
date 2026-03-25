@@ -46,6 +46,7 @@ export class MafiaClient extends EventEmitter {
   private _playerId?: string;
   private _token?: string;
   private _gameState?: GameState;
+  private _isSpectator = false;
   private _intentionalDisconnect = false;
   private _reconnectAttempts = 0;
   private readonly _reconnectDelayMs: number;
@@ -77,6 +78,7 @@ export class MafiaClient extends EventEmitter {
   get playerId(): string | undefined { return this._playerId; }
   get token(): string | undefined { return this._token; }
   get gameState(): GameState | undefined { return this._gameState; }
+  get isSpectator(): boolean { return this._isSpectator; }
 
   isConnected(): boolean {
     return !!this.ws && this.ws.readyState === 1; // WebSocket.OPEN
@@ -156,6 +158,30 @@ export class MafiaClient extends EventEmitter {
     this._playerId = data.playerId;
     this._token = data.token;
     this._gameState = data.state;
+    return data.state;
+  }
+
+  /**
+   * Join an existing game as a spectator (read-only observer).
+   */
+  async joinAsSpectator(gameId: string, spectatorName: string): Promise<GameState> {
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${gameId}/spectate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorName })
+    });
+
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+
+    const data = await res.json() as { spectatorId: string; token?: string; state: GameState };
+    this._gameId = gameId;
+    this._playerId = data.spectatorId;
+    this._token = data.token;
+    this._gameState = data.state;
+    this._isSpectator = true;
     return data.state;
   }
 
@@ -332,6 +358,7 @@ export class MafiaClient extends EventEmitter {
     this._playerId = undefined;
     this._token = undefined;
     this._gameState = undefined;
+    this._isSpectator = false;
     return data;
   }
 
@@ -480,7 +507,9 @@ export class MafiaClient extends EventEmitter {
       case 'player_joined':
       case 'player_left':
       case 'player_eliminated':
-      case 'game_ended': {
+      case 'game_ended':
+      case 'spectator_joined':
+      case 'spectator_left': {
         const p = msg.payload as { state?: GameState } | undefined;
         if (p?.state) {
           this._gameState = p.state;

@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('mafia', {
     ipcRenderer.invoke('mafia:create-game', serverUrl, playerName, settings),
   joinGame: (serverUrl: string, gameId: string, playerName: string) =>
     ipcRenderer.invoke('mafia:join-game', serverUrl, gameId, playerName),
+  joinAsSpectator: (serverUrl: string, gameId: string, spectatorName: string) =>
+    ipcRenderer.invoke('mafia:join-as-spectator', serverUrl, gameId, spectatorName),
   getState: () => ipcRenderer.invoke('mafia:get-state'),
   listGames: (serverUrl: string) => ipcRenderer.invoke('mafia:list-games', serverUrl),
   markReady: () => ipcRenderer.invoke('mafia:mark-ready'),
@@ -39,5 +41,9 @@ contextBridge.exposeInMainWorld('mafia', {
     ipcRenderer.on('mafia:chat_message', (_e, p) => cb(p)),
   onDeepLink: (cb: (payload: { gameId?: string; serverUrl?: string }) => void) =>
     ipcRenderer.on('mafia:deep_link', (_e, p) => cb(p)),
-  getStartupDeepLink: () => ipcRenderer.invoke('mafia:get-startup-deep-link')
+  getStartupDeepLink: () => ipcRenderer.invoke('mafia:get-startup-deep-link'),
+  onSpectatorJoined: (cb: (payload: unknown) => void) =>
+    ipcRenderer.on('mafia:spectator_joined', (_e, p) => cb(p)),
+  onSpectatorLeft: (cb: (payload: unknown) => void) =>
+    ipcRenderer.on('mafia:spectator_left', (_e, p) => cb(p))
 });

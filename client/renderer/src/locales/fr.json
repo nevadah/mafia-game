@@ -131,5 +131,17 @@
   "actionStartingGame": "Démarrage",
   "actionCastingVote": "Vote en cours",
   "actionResolvingDay": "Résolution du jour",
-  "actionResolvingNight": "Résolution de la nuit"
+  "actionResolvingNight": "Résolution de la nuit",
+
+  "spectateGame": "Spectater",
+  "spectatingBadge": "Spectateur",
+  "spectatorsLabel": "Spectateurs",
+  "spectatorCount_one": "{{count}} spectateur",
+  "spectatorCount_other": "{{count}} spectateurs",
+  "copySpectateLink": "Copier le lien spectateur",
+  "spectatingContext": "Mode spectateur",
+  "statusSpectatingGame": "Rejoindre en tant que spectateur...",
+  "statusSpectateLinkLoaded": "Lien spectateur chargé pour la partie {{gameId}}.",
+  "statusSpectateCopied": "Lien spectateur copié.",
+  "statusNoSpectateLink": "Aucun lien spectateur disponible."
 }

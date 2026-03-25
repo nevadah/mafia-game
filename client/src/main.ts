@@ -10,6 +10,7 @@ let pendingDeepLink: DeepLinkPayload | null = null;
 
 export type DeepLinkPayload =
   | { action: 'join'; gameId: string; name?: string; serverUrl?: string }
+  | { action: 'spectate'; gameId: string; name?: string; serverUrl?: string }
   | { action: 'create'; name?: string; serverUrl?: string };
 
 function parseDeepLink(raw: string): DeepLinkPayload | null {
@@ -27,6 +28,12 @@ function parseDeepLink(raw: string): DeepLinkPayload | null {
       const gameId = url.searchParams.get('gameId') ?? undefined;
       if (!gameId) return null;
       return { action: 'join', gameId, name, serverUrl };
+    }
+
+    if (target === 'spectate') {
+      const gameId = url.searchParams.get('gameId') ?? undefined;
+      if (!gameId) return null;
+      return { action: 'spectate', gameId, name, serverUrl };
     }
 
     if (target === 'create') {
@@ -87,6 +94,8 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('game_ended', (p) => mainWindow?.webContents.send('mafia:game_ended', p));
   c.on('server_error', (p) => mainWindow?.webContents.send('mafia:server_error', p));
   c.on('chat_message', (p) => mainWindow?.webContents.send('mafia:chat_message', p));
+  c.on('spectator_joined', (p) => mainWindow?.webContents.send('mafia:spectator_joined', p));
+  c.on('spectator_left', (p) => mainWindow?.webContents.send('mafia:spectator_left', p));
 }
 
 const multiInstance = Boolean(process.env.MAFIA_MULTI_INSTANCE);
@@ -158,6 +167,16 @@ ipcMain.handle('mafia:create-game', async (_event, serverUrl: string, playerName
   const state = await client.createGame(playerName, settings);
   await client.connect();
   return { state, playerId: client.playerId, gameId: client.gameId };
+});
+
+ipcMain.handle('mafia:join-as-spectator', async (_event, serverUrl: string, gameId: string, spectatorName: string) => {
+  client?.disconnect();
+  client = new MafiaClient(serverUrl);
+  attachClientEvents(client);
+
+  const state = await client.joinAsSpectator(gameId, spectatorName);
+  await client.connect();
+  return { state, spectatorId: client.playerId, gameId: client.gameId };
 });
 
 ipcMain.handle('mafia:join-game', async (_event, serverUrl: string, gameId: string, playerName: string) => {

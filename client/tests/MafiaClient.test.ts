@@ -9,6 +9,7 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
     phase: 'lobby',
     status: 'waiting',
     players: [{ id: 'p1', name: 'Alice', isAlive: true, isConnected: true, isReady: false }],
+    spectators: [],
     round: 0,
     hostId: 'p1',
     votes: {},

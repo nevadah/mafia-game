@@ -34,11 +34,18 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface SpectatorData {
+  id: string;
+  name: string;
+  isConnected: boolean;
+}
+
 export interface GameState {
   id: string;
   phase: GamePhase;
   status: GameStatus;
   players: PlayerData[];
+  spectators: SpectatorData[];
   round: number;
   winner?: 'mafia' | 'town';
   hostId: string;

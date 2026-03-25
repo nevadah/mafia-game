@@ -7,7 +7,8 @@ import {
   GameSettings,
   ChatMessage,
   EliminationRecord,
-  Role
+  Role,
+  SpectatorData
 } from './types';
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -22,6 +23,7 @@ export class Game {
   readonly id: string;
   readonly hostId: string;
   private players: Map<string, Player>;
+  private spectators: Map<string, SpectatorData>;
   private phase: GamePhase;
   private status: GameStatus;
   private round: number;
@@ -41,6 +43,7 @@ export class Game {
     this.id = uuidv4();
     this.hostId = hostId;
     this.players = new Map();
+    this.spectators = new Map();
     this.phase = 'lobby';
     this.status = 'waiting';
     this.round = 0;
@@ -103,6 +106,34 @@ export class Game {
 
   getPlayerCount(): number {
     return this.players.size;
+  }
+
+  // ── Spectator management ───────────────────────────────────────────────────
+
+  addSpectator(id: string, name: string): void {
+    this.spectators.set(id, { id, name, isConnected: true });
+    this.touch();
+  }
+
+  removeSpectator(spectatorId: string): void {
+    if (this.spectators.delete(spectatorId)) {
+      this.touch();
+    }
+  }
+
+  getSpectator(spectatorId: string): SpectatorData | undefined {
+    return this.spectators.get(spectatorId);
+  }
+
+  getSpectators(): SpectatorData[] {
+    return [...this.spectators.values()];
+  }
+
+  setSpectatorConnected(spectatorId: string, connected: boolean): void {
+    const spectator = this.spectators.get(spectatorId);
+    if (spectator) {
+      spectator.isConnected = connected;
+    }
   }
 
   // ── Ready status ───────────────────────────────────────────────────────────
@@ -519,6 +550,7 @@ export class Game {
       phase: this.phase,
       status: this.status,
       players,
+      spectators: this.getSpectators(),
       round: this.round,
       winner: this.winner,
       hostId: this.hostId,

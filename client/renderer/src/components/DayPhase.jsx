@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import NightSummaryModal from './NightSummaryModal';
 
 export default function DayPhase({
-  currentState, currentPlayerId, me, isHost,
+  currentState, currentPlayerId, me, isHost, isSpectator,
   dismissedNightSummaryRound, onDismissNightSummary,
   runAction, onLeave
 }) {
@@ -40,11 +40,14 @@ export default function DayPhase({
           <span className="phase">{t('dayPhase', { round: currentState.round })}</span>
           <span className="phase-meta">{t('dayMeta')}</span>
         </div>
-        <p className="meta">
-          {t('playingAs')} <strong>{me?.name}</strong>
-          {me?.role && <> · {t('roleLabel')}: <strong>{me.role}</strong></>}
-          {isHost && ` · ${t('hostBadge')}`}
-        </p>
+        {isSpectator
+          ? <p className="meta"><em>{t('spectatingContext')}</em></p>
+          : <p className="meta">
+              {t('playingAs')} <strong>{me?.name}</strong>
+              {me?.role && <> · {t('roleLabel')}: <strong>{me.role}</strong></>}
+              {isHost && ` · ${t('hostBadge')}`}
+            </p>
+        }
       </div>
 
       <div className="card stack">
