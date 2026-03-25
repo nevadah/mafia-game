@@ -11,3 +11,7 @@ mafia-test-server-pid.txt
 .dolt/
 *.db
 .beads-credential-key
+
+# Playwright E2E outputs
+client/e2e-report/
+client/test-results/
