@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
 export default function LobbyPhase({
-  currentState, currentPlayerId, me, isHost, canStart,
-  runAction, onLeave, onCopyCode, onCopyInviteLink
+  currentState, currentPlayerId, me, isHost, canStart, isSpectator,
+  runAction, onLeave, onCopyCode, onCopyInviteLink, onCopySpectateLink
 }) {
   const { t } = useTranslation();
 
@@ -28,6 +28,9 @@ export default function LobbyPhase({
             <button className="copy-link-btn" onClick={onCopyInviteLink}>
               {t('copyInviteLink')}
             </button>
+            <button className="copy-link-btn" onClick={onCopySpectateLink}>
+              {t('copySpectateLink')}
+            </button>
           </div>
         </div>
       </div>
@@ -50,20 +53,45 @@ export default function LobbyPhase({
         </div>
       </div>
 
-      <div className="lobby-actions">
-        {!me?.isReady
-          ? <button onClick={() => runAction(t('actionMarkingReady'), window.mafia.markReady)}>{t('readyButton')}</button>
-          : <button onClick={() => runAction(t('actionMarkingUnready'), window.mafia.markUnready)}>{t('unreadyButton')}</button>
-        }
-        {isHost && (
-          <button disabled={!canStart} onClick={() => runAction(t('actionStartingGame'), window.mafia.startGame)}>
-            {t('startGame')}
-          </button>
-        )}
-        <button className="btn-secondary" onClick={onLeave}>{t('leaveButton')}</button>
-      </div>
+      {(currentState.spectators ?? []).length > 0 && (
+        <div>
+          <label>{t('spectatorsLabel')}</label>
+          <div className="players">
+            {(currentState.spectators ?? []).map((spectator) => (
+              <div key={spectator.id} className="player">
+                <div className="player-name">{spectator.name}</div>
+                <div className="badges">
+                  {spectator.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
+                  <span className="badge spectating">{t('spectatingBadge')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {isHost && !canStart && (
+      {!isSpectator && (
+        <div className="lobby-actions">
+          {!me?.isReady
+            ? <button onClick={() => runAction(t('actionMarkingReady'), window.mafia.markReady)}>{t('readyButton')}</button>
+            : <button onClick={() => runAction(t('actionMarkingUnready'), window.mafia.markUnready)}>{t('unreadyButton')}</button>
+          }
+          {isHost && (
+            <button disabled={!canStart} onClick={() => runAction(t('actionStartingGame'), window.mafia.startGame)}>
+              {t('startGame')}
+            </button>
+          )}
+          <button className="btn-secondary" onClick={onLeave}>{t('leaveButton')}</button>
+        </div>
+      )}
+
+      {isSpectator && (
+        <div className="lobby-actions">
+          <button className="btn-secondary" onClick={onLeave}>{t('leaveButton')}</button>
+        </div>
+      )}
+
+      {isHost && !canStart && !isSpectator && (
         <p className="lobby-hint">
           {currentState.players.length < currentState.settings.minPlayers
             ? t('needMorePlayers', { count: currentState.settings.minPlayers })

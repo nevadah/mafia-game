@@ -6,7 +6,7 @@ export default function EntryScreen({
   gameIdInput, setGameIdInput,
   serverUrl, setServerUrl,
   settings, onSettingChange,
-  onCreate, onJoin, onBrowse
+  onCreate, onJoin, onSpectate, onBrowse
 }) {
   const { t } = useTranslation();
 
@@ -56,6 +56,12 @@ export default function EntryScreen({
         <button className="btn-full" onClick={joinMode ? onJoin : onCreate}>
           {joinMode ? t('joinGame') : t('createGame')}
         </button>
+
+        {joinMode && (
+          <button className="btn-full btn-secondary" onClick={onSpectate}>
+            {t('spectateGame')}
+          </button>
+        )}
 
         {!joinMode && (
           <button className="btn-full btn-secondary" onClick={onBrowse}>

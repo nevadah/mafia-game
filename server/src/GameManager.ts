@@ -7,6 +7,7 @@ interface Session {
   token: string;
   gameId: string;
   playerId: string;
+  isSpectator: boolean;
 }
 
 export class GameManager {
@@ -41,6 +42,9 @@ export class GameManager {
 
     for (const player of game.getPlayers()) {
       this.revokeSessionsForPlayer(gameId, player.id);
+    }
+    for (const spectator of game.getSpectators()) {
+      this.revokeSessionsForPlayer(gameId, spectator.id);
     }
 
     return this.games.delete(gameId);
@@ -85,6 +89,29 @@ export class GameManager {
     return { deletedGame: false };
   }
 
+  joinAsSpectator(gameId: string, spectatorName: string): { game: Game; spectatorId: string; token: string } {
+    const game = this.getGame(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    const spectatorId = uuidv4();
+    game.addSpectator(spectatorId, spectatorName);
+
+    const token = this.issueSession(gameId, spectatorId, true);
+    return { game, spectatorId, token };
+  }
+
+  leaveSpectator(gameId: string, spectatorId: string): void {
+    const game = this.getGame(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    game.removeSpectator(spectatorId);
+    this.revokeSessionsForPlayer(gameId, spectatorId);
+  }
+
   listGames(): Game[] {
     return [...this.games.values()];
   }
@@ -119,9 +146,9 @@ export class GameManager {
     return removed;
   }
 
-  private issueSession(gameId: string, playerId: string): string {
+  private issueSession(gameId: string, playerId: string, isSpectator = false): string {
     const token = uuidv4();
-    this.sessions.set(token, { token, gameId, playerId });
+    this.sessions.set(token, { token, gameId, playerId, isSpectator });
     return token;
   }
 

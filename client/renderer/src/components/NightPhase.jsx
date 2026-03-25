@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function NightPhase({
-  currentState, currentPlayerId, me, isHost,
+  currentState, currentPlayerId, me, isHost, isSpectator,
   runAction, onLeave
 }) {
   const { t } = useTranslation();
@@ -44,11 +44,14 @@ export default function NightPhase({
             {(!myRole || myRole === 'townsperson') && t('nightTownMeta')}
           </span>
         </div>
-        <p className="meta">
-          {t('playingAs')} <strong>{me?.name}</strong>
-          {myRole && <> · {t('roleLabel')}: <strong>{myRole}</strong></>}
-          {isHost && ` · ${t('hostBadge')}`}
-        </p>
+        {isSpectator
+          ? <p className="meta"><em>{t('spectatingContext')}</em></p>
+          : <p className="meta">
+              {t('playingAs')} <strong>{me?.name}</strong>
+              {myRole && <> · {t('roleLabel')}: <strong>{myRole}</strong></>}
+              {isHost && ` · ${t('hostBadge')}`}
+            </p>
+        }
       </div>
 
       {myRole === 'sheriff' && investigatedPlayer && (

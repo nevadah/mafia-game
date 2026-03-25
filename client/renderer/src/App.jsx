@@ -85,6 +85,7 @@ export default function App() {
   const [currentState, setCurrentState] = useState(null);
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [currentGameId, setCurrentGameId] = useState(null);
+  const [isSpectator, setIsSpectator] = useState(false);
   const [dismissedNightSummaryRound, setDismissedNightSummaryRound] = useState(null);
 
   const currentStateRef = useRef(currentState);
@@ -104,6 +105,9 @@ export default function App() {
     } else if (pending.action === 'join' && playerName === pending.name && gameIdInput === pending.gameId) {
       pendingAutoAction.current = null;
       handleJoin();
+    } else if (pending.action === 'spectate' && playerName === pending.name && gameIdInput === pending.gameId) {
+      pendingAutoAction.current = null;
+      handleSpectate();
     }
   }, [playerName, gameIdInput]);
 
@@ -139,6 +143,7 @@ export default function App() {
     setCurrentState(null);
     setCurrentPlayerId(null);
     setCurrentGameId(null);
+    setIsSpectator(false);
     setDismissedNightSummaryRound(null);
     setStatus({ message: '', error: false });
   }
@@ -146,6 +151,13 @@ export default function App() {
   function onConnected(result) {
     setCurrentPlayerId(result.playerId);
     setCurrentGameId(result.gameId);
+    applyState(result.state);
+  }
+
+  function onSpectating(result) {
+    setCurrentPlayerId(result.spectatorId);
+    setCurrentGameId(result.gameId);
+    setIsSpectator(true);
     applyState(result.state);
   }
 
@@ -169,6 +181,13 @@ export default function App() {
     return `mafia://join?${params.toString()}`;
   }
 
+  function buildSpectateDeepLink() {
+    const gameId = currentGameId || (currentState && currentState.id);
+    if (!gameId) return null;
+    const params = new URLSearchParams({ gameId, serverUrl: serverUrl || 'http://localhost:3000' });
+    return `mafia://spectate?${params.toString()}`;
+  }
+
   // ── Entry handlers ────────────────────────────────────────────────────────────
 
   async function handleCreate() {
@@ -189,6 +208,18 @@ export default function App() {
       showStatus(t('statusJoiningGame'));
       const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
       onConnected(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  async function handleSpectate() {
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
+    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
+    try {
+      showStatus(t('statusSpectatingGame'));
+      const result = await window.mafia.joinAsSpectator(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
+      onSpectating(result);
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
     }
@@ -223,6 +254,17 @@ export default function App() {
       showStatus(t('statusCodeCopied'));
     } catch {
       showStatus(t('statusCopyFailed', { code: currentState.id }), true);
+    }
+  }
+
+  async function handleCopySpectateLink() {
+    const link = buildSpectateDeepLink();
+    if (!link) { showStatus(t('statusNoSpectateLink'), true); return; }
+    try {
+      await copyText(link);
+      showStatus(t('statusSpectateCopied'));
+    } catch {
+      showStatus(t('statusInviteFailed', { link }), true);
     }
   }
 
@@ -271,6 +313,15 @@ export default function App() {
           setPlayerName(payload.name);
           pendingAutoAction.current = { action: 'create', name: payload.name };
         }
+      } else if (payload.action === 'spectate' && payload.gameId) {
+        setGameIdInput(payload.gameId);
+        setJoinMode(true);
+        if (payload.name) {
+          setPlayerName(payload.name);
+          pendingAutoAction.current = { action: 'spectate', name: payload.name, gameId: payload.gameId };
+        } else {
+          showStatus(t('statusSpectateLinkLoaded', { gameId: payload.gameId }));
+        }
       } else if (payload.gameId) {
         setGameIdInput(payload.gameId);
         setJoinMode(true);
@@ -293,7 +344,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <AppHeader theme={theme} onToggleTheme={toggleTheme} />
+      <AppHeader theme={theme} onToggleTheme={toggleTheme} isSpectator={isSpectator} />
 
       {!currentState && (
         <EntryScreen
@@ -302,7 +353,7 @@ export default function App() {
           gameIdInput={gameIdInput} setGameIdInput={setGameIdInput}
           serverUrl={serverUrl} setServerUrl={setServerUrl}
           settings={gameSettings} onSettingChange={handleSettingChange}
-          onCreate={handleCreate} onJoin={handleJoin} onBrowse={handleBrowse}
+          onCreate={handleCreate} onJoin={handleJoin} onSpectate={handleSpectate} onBrowse={handleBrowse}
         />
       )}
 
@@ -313,10 +364,12 @@ export default function App() {
           me={me}
           isHost={isHost}
           canStart={canStart}
+          isSpectator={isSpectator}
           runAction={runAction}
           onLeave={handleLeave}
           onCopyCode={handleCopyCode}
           onCopyInviteLink={handleCopyInviteLink}
+          onCopySpectateLink={handleCopySpectateLink}
         />
       )}
 
@@ -326,6 +379,7 @@ export default function App() {
           currentPlayerId={currentPlayerId}
           me={me}
           isHost={isHost}
+          isSpectator={isSpectator}
           dismissedNightSummaryRound={dismissedNightSummaryRound}
           onDismissNightSummary={setDismissedNightSummaryRound}
           runAction={runAction}
@@ -339,6 +393,7 @@ export default function App() {
           currentPlayerId={currentPlayerId}
           me={me}
           isHost={isHost}
+          isSpectator={isSpectator}
           runAction={runAction}
           onLeave={handleLeave}
         />

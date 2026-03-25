@@ -131,5 +131,17 @@
   "actionStartingGame": "Starte Spiel",
   "actionCastingVote": "Stimme abgeben",
   "actionResolvingDay": "Tag auflösen",
-  "actionResolvingNight": "Nacht auflösen"
+  "actionResolvingNight": "Nacht auflösen",
+
+  "spectateGame": "Zuschauen",
+  "spectatingBadge": "Zuschauer",
+  "spectatorsLabel": "Zuschauer",
+  "spectatorCount_one": "{{count}} Zuschauer",
+  "spectatorCount_other": "{{count}} Zuschauer",
+  "copySpectateLink": "Zuschauerlink kopieren",
+  "spectatingContext": "Zuschauermodus",
+  "statusSpectatingGame": "Als Zuschauer beitreten...",
+  "statusSpectateLinkLoaded": "Zuschauerlink für Spiel {{gameId}} geladen.",
+  "statusSpectateCopied": "Zuschauerlink kopiert.",
+  "statusNoSpectateLink": "Kein Zuschauerlink verfügbar."
 }

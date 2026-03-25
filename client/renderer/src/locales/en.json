@@ -131,5 +131,17 @@
   "actionStartingGame": "Starting game",
   "actionCastingVote": "Casting vote",
   "actionResolvingDay": "Resolving day",
-  "actionResolvingNight": "Resolving night"
+  "actionResolvingNight": "Resolving night",
+
+  "spectateGame": "Spectate",
+  "spectatingBadge": "Spectating",
+  "spectatorsLabel": "Spectators",
+  "spectatorCount_one": "{{count}} spectator",
+  "spectatorCount_other": "{{count}} spectators",
+  "copySpectateLink": "Copy Spectate Link",
+  "spectatingContext": "Spectating",
+  "statusSpectatingGame": "Joining as spectator...",
+  "statusSpectateLinkLoaded": "Spectate link loaded for game {{gameId}}.",
+  "statusSpectateCopied": "Spectate link copied.",
+  "statusNoSpectateLink": "No spectate link available."
 }
