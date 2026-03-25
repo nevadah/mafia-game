@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "mafia_game",
+  "project_id": "668c607e-374c-457a-8557-c3ecc05601be"
+}
