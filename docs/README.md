@@ -9,11 +9,12 @@ This folder is the canonical technical map for the project.
 3. `docs/system-architecture.md`
 4. `docs/game-flows.md`
 5. `docs/api-and-events.md`
+6. `docs/beads.md` — task tracking and AI workflow tooling
 
 ## Audience Guide
 
 - New developers: start with onboarding and project structure.
-- AI agents: use onboarding + API/events before editing behavior.
+- AI agents: use onboarding + API/events before editing behavior; see `beads.md` for task tracking workflow.
 - Feature work: review game flows and architecture first.
 
 ## Scope
