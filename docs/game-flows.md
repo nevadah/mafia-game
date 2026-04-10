@@ -12,8 +12,8 @@
 1. Host calls `POST /games/:gameId/start`.
 2. Server assigns roles and switches state:
 - status: `waiting -> active`
-- phase: `lobby -> day`
-- round: `0 -> 1`
+- phase: `lobby -> night`
+- round: stays `0` (increments to `1` after the first night resolves)
 3. Server broadcasts `game_started`.
 
 ## 3. Day Flow
