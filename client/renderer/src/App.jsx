@@ -95,6 +95,69 @@ export default function App() {
   useEffect(() => { currentStateRef.current = currentState; }, [currentState]);
   useEffect(() => { currentGameIdRef.current = currentGameId; }, [currentGameId]);
 
+  // ── Stable callbacks ──────────────────────────────────────────────────────────
+  // Defined before the auto-submit effect so they can appear in its deps array.
+
+  const showStatus = useCallback((message, error = false) => {
+    setStatus({ message, error });
+  }, []);
+
+  const applyState = useCallback((state) => {
+    if (!state) return;
+    setCurrentState(state);
+    setCurrentGameId(state.id);
+  }, []);
+
+  const onConnected = useCallback((result) => {
+    setCurrentPlayerId(result.playerId);
+    setCurrentGameId(result.gameId);
+    applyState(result.state);
+  }, [applyState]);
+
+  const onSpectating = useCallback((result) => {
+    setCurrentPlayerId(result.spectatorId);
+    setCurrentGameId(result.gameId);
+    setIsSpectator(true);
+    applyState(result.state);
+  }, [applyState]);
+
+  // ── Entry handlers ────────────────────────────────────────────────────────────
+
+  const handleCreate = useCallback(async () => {
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
+    try {
+      showStatus(t('statusCreatingGame'));
+      const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim(), gameSettings);
+      onConnected(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }, [playerName, serverUrl, gameSettings, t, showStatus, onConnected]);
+
+  const handleJoin = useCallback(async () => {
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
+    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
+    try {
+      showStatus(t('statusJoiningGame'));
+      const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
+      onConnected(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }, [playerName, gameIdInput, serverUrl, t, showStatus, onConnected]);
+
+  const handleSpectate = useCallback(async () => {
+    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
+    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
+    try {
+      showStatus(t('statusSpectatingGame'));
+      const result = await window.mafia.joinAsSpectator(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
+      onSpectating(result);
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }, [playerName, gameIdInput, serverUrl, t, showStatus, onSpectating]);
+
   // Fires after state has flushed when a deep-link with auto-submit was received.
   useEffect(() => {
     const pending = pendingAutoAction.current;
@@ -109,7 +172,7 @@ export default function App() {
       pendingAutoAction.current = null;
       handleSpectate();
     }
-  }, [playerName, gameIdInput]);
+  }, [playerName, gameIdInput, handleCreate, handleJoin, handleSpectate]);
 
   const me = useMemo(() => {
     if (!currentState || !currentPlayerId) return null;
@@ -127,17 +190,7 @@ export default function App() {
     && currentState?.players.length >= currentState?.settings?.minPlayers
     && currentState?.readyCount === currentState?.players.length;
 
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-
-  function showStatus(message, error = false) {
-    setStatus({ message, error });
-  }
-
-  function applyState(state) {
-    if (!state) return;
-    setCurrentState(state);
-    setCurrentGameId(state.id);
-  }
+  // ── Remaining helpers ─────────────────────────────────────────────────────────
 
   function resetGameUi() {
     setCurrentState(null);
@@ -146,19 +199,6 @@ export default function App() {
     setIsSpectator(false);
     setDismissedNightSummaryRound(null);
     setStatus({ message: '', error: false });
-  }
-
-  function onConnected(result) {
-    setCurrentPlayerId(result.playerId);
-    setCurrentGameId(result.gameId);
-    applyState(result.state);
-  }
-
-  function onSpectating(result) {
-    setCurrentPlayerId(result.spectatorId);
-    setCurrentGameId(result.gameId);
-    setIsSpectator(true);
-    applyState(result.state);
   }
 
   async function runAction(label, action) {
@@ -186,43 +226,6 @@ export default function App() {
     if (!gameId) return null;
     const params = new URLSearchParams({ gameId, serverUrl: serverUrl || 'http://localhost:3000' });
     return `mafia://spectate?${params.toString()}`;
-  }
-
-  // ── Entry handlers ────────────────────────────────────────────────────────────
-
-  async function handleCreate() {
-    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
-    try {
-      showStatus(t('statusCreatingGame'));
-      const result = await window.mafia.createGame(serverUrl.trim(), playerName.trim(), gameSettings);
-      onConnected(result);
-    } catch (err) {
-      showStatus(`Error: ${err.message}`, true);
-    }
-  }
-
-  async function handleJoin() {
-    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
-    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
-    try {
-      showStatus(t('statusJoiningGame'));
-      const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
-      onConnected(result);
-    } catch (err) {
-      showStatus(`Error: ${err.message}`, true);
-    }
-  }
-
-  async function handleSpectate() {
-    if (!playerName.trim()) { showStatus(t('statusEnterName'), true); return; }
-    if (!gameIdInput.trim()) { showStatus(t('statusEnterCode'), true); return; }
-    try {
-      showStatus(t('statusSpectatingGame'));
-      const result = await window.mafia.joinAsSpectator(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
-      onSpectating(result);
-    } catch (err) {
-      showStatus(`Error: ${err.message}`, true);
-    }
   }
 
   async function handleLeave() {
@@ -338,6 +341,7 @@ export default function App() {
 
     // Pull any deep link that arrived before the renderer was ready to listen.
     window.mafia.getStartupDeepLink().then(handleDeepLink);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-time IPC listener registration
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────

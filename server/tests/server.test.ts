@@ -385,7 +385,7 @@ describe('REST API', () => {
     }
 
     it('submits a night action', async () => {
-      const { gameId, playerIds } = await setupNightGame();
+      const { gameId } = await setupNightGame();
       const game = gameManager.getGame(gameId)!;
       const mafia = game.getPlayers().find(p => p.role === 'mafia')!;
       const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;

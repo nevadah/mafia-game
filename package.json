@@ -18,6 +18,19 @@
     "multi-client": "scripts/multi-client.sh",
     "dev:backend": "scripts/dev-backend.sh",
     "simulate": "ts-node --transpile-only client/scripts/simulate-game.ts",
-    "dev:party": "npm run dev:party --workspace=client"
+    "dev:party": "npm run dev:party --workspace=client",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.3",
+    "typescript-eslint": "^8.58.2"
   }
 }
