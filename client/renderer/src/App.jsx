@@ -4,6 +4,7 @@ import './i18n';
 
 import AppHeader       from './components/AppHeader';
 import EntryScreen     from './components/EntryScreen';
+import ErrorBoundary   from './components/ErrorBoundary';
 import LobbyPhase      from './components/LobbyPhase';
 import DayPhase        from './components/DayPhase';
 import NightPhase      from './components/NightPhase';
@@ -361,55 +362,57 @@ export default function App() {
         />
       )}
 
-      {inLobby && (
-        <LobbyPhase
-          currentState={currentState}
-          currentPlayerId={currentPlayerId}
-          me={me}
-          isHost={isHost}
-          canStart={canStart}
-          isSpectator={isSpectator}
-          runAction={runAction}
-          onLeave={handleLeave}
-          onCopyCode={handleCopyCode}
-          onCopyInviteLink={handleCopyInviteLink}
-          onCopySpectateLink={handleCopySpectateLink}
-        />
-      )}
+      <ErrorBoundary onReset={resetGameUi}>
+        {inLobby && (
+          <LobbyPhase
+            currentState={currentState}
+            currentPlayerId={currentPlayerId}
+            me={me}
+            isHost={isHost}
+            canStart={canStart}
+            isSpectator={isSpectator}
+            runAction={runAction}
+            onLeave={handleLeave}
+            onCopyCode={handleCopyCode}
+            onCopyInviteLink={handleCopyInviteLink}
+            onCopySpectateLink={handleCopySpectateLink}
+          />
+        )}
 
-      {inDay && (
-        <DayPhase
-          currentState={currentState}
-          currentPlayerId={currentPlayerId}
-          me={me}
-          isHost={isHost}
-          isSpectator={isSpectator}
-          dismissedNightSummaryRound={dismissedNightSummaryRound}
-          onDismissNightSummary={setDismissedNightSummaryRound}
-          runAction={runAction}
-          onLeave={handleLeave}
-        />
-      )}
+        {inDay && (
+          <DayPhase
+            currentState={currentState}
+            currentPlayerId={currentPlayerId}
+            me={me}
+            isHost={isHost}
+            isSpectator={isSpectator}
+            dismissedNightSummaryRound={dismissedNightSummaryRound}
+            onDismissNightSummary={setDismissedNightSummaryRound}
+            runAction={runAction}
+            onLeave={handleLeave}
+          />
+        )}
 
-      {inNight && (
-        <NightPhase
-          currentState={currentState}
-          currentPlayerId={currentPlayerId}
-          me={me}
-          isHost={isHost}
-          isSpectator={isSpectator}
-          runAction={runAction}
-          onLeave={handleLeave}
-        />
-      )}
+        {inNight && (
+          <NightPhase
+            currentState={currentState}
+            currentPlayerId={currentPlayerId}
+            me={me}
+            isHost={isHost}
+            isSpectator={isSpectator}
+            runAction={runAction}
+            onLeave={handleLeave}
+          />
+        )}
 
-      {isEnded && (
-        <GameOver
-          currentState={currentState}
-          currentPlayerId={currentPlayerId}
-          onBackToMenu={resetGameUi}
-        />
-      )}
+        {isEnded && (
+          <GameOver
+            currentState={currentState}
+            currentPlayerId={currentPlayerId}
+            onBackToMenu={resetGameUi}
+          />
+        )}
+      </ErrorBoundary>
 
       <StatusBar message={status.message} error={status.error} />
     </div>
