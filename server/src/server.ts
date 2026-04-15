@@ -610,21 +610,6 @@ export function createWebSocketServer(
       ws.send(JSON.stringify({ type: 'connected', payload: {} }));
     }
 
-    ws.on('message', (data: Buffer) => {
-      try {
-        const message = JSON.parse(data.toString());
-        const info = clients.get(ws);
-        if (!info?.gameId) return;
-
-        const game = gameManager.getGame(info.gameId);
-        if (!game) return;
-
-        handleClientMessage(ws, game, info.playerId, message, broadcast);
-      } catch {
-        ws.send(JSON.stringify({ type: 'error', payload: { message: 'Invalid message format' } }));
-      }
-    });
-
     ws.on('close', () => {
       const info = clients.get(ws);
       clients.delete(ws);
@@ -675,62 +660,3 @@ export function createWebSocketServer(
   return wss;
 }
 
-function handleClientMessage(
-  ws: WebSocket,
-  game: ReturnType<GameManager['getGame']>,
-  playerId: string | undefined,
-  message: { type: string; payload?: Record<string, string> },
-  broadcast: (gameId: string, msg: ServerToClientMessage, exclude?: WebSocket) => void
-): void {
-  if (!game) return;
-
-  switch (message.type) {
-    case 'get_state': {
-      ws.send(
-        JSON.stringify({
-          type: 'game_state',
-          payload: { state: game.toState(playerId) }
-        })
-      );
-      break;
-    }
-    case 'mark_ready': {
-      if (!playerId) break;
-      try {
-        game.markPlayerReady(playerId);
-        broadcast(game.id, {
-          type: 'player_ready',
-          payload: { playerId, readyCount: game.getReadyCount(), allReady: game.areAllPlayersReady(), state: game.toState() }
-        });
-      } catch (err) {
-        ws.send(JSON.stringify({ type: 'error', payload: { message: (err as Error).message } }));
-      }
-      break;
-    }
-    case 'cast_vote': {
-      if (!playerId || !message.payload?.targetId) break;
-      try {
-        game.castVote(playerId, message.payload.targetId);
-        broadcast(game.id, {
-          type: 'vote_cast',
-          payload: { voterId: playerId, votes: game.getVotes() }
-        });
-      } catch (err) {
-        ws.send(JSON.stringify({ type: 'error', payload: { message: (err as Error).message } }));
-      }
-      break;
-    }
-    case 'night_action': {
-      if (!playerId || !message.payload?.targetId) break;
-      try {
-        game.submitNightAction(playerId, message.payload.targetId);
-        ws.send(JSON.stringify({ type: 'game_state', payload: { state: game.toState(playerId) } }));
-      } catch (err) {
-        ws.send(JSON.stringify({ type: 'error', payload: { message: (err as Error).message } }));
-      }
-      break;
-    }
-    default:
-      ws.send(JSON.stringify({ type: 'error', payload: { message: 'Unknown message type' } }));
-  }
-}

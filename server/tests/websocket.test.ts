@@ -126,143 +126,6 @@ describe('WebSocket Server', () => {
     expect(msg.type).toBe('connected');
   });
 
-  it('sends game_state on get_state message', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // consume 'connected'
-    client.ws.send(JSON.stringify({ type: 'get_state' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('game_state');
-  });
-
-  it('handles cast_vote message during day phase', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const { player: bob } = gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    game.start();
-    game.advancePhase(); // night → day
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'cast_vote', payload: { targetId: bob.id } }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('vote_cast');
-  });
-
-  it('handles cast_vote error (self-vote)', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    game.start();
-    game.advancePhase(); // night → day
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'cast_vote', payload: { targetId: hostPlayer.id } }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('error');
-  });
-
-  it('handles cast_vote without targetId (no-op)', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    game.start();
-    game.advancePhase(); // night → day
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'cast_vote', payload: {} }));
-    // No targetId means no-op, then get_state should return game_state
-    client.ws.send(JSON.stringify({ type: 'get_state' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('game_state');
-  });
-
-  it('handles night_action message during night phase', async () => {
-    const { game } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    gameManager.joinGame(game.id, 'Eve');
-    game.start(); // starts in night
-
-    const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
-    const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${mafia.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'night_action', payload: { targetId: target.id } }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('game_state');
-  });
-
-  it('handles night_action error (wrong phase)', async () => {
-    const { game } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    gameManager.joinGame(game.id, 'Eve');
-    game.start();
-    game.advancePhase(); // night → day
-
-    const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
-    const target = game.getAlivePlayers().find(p => p.role !== 'mafia')!;
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${mafia.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'night_action', payload: { targetId: target.id } }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('error');
-  });
-
-  it('handles night_action without targetId (no-op)', async () => {
-    const { game } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    gameManager.joinGame(game.id, 'Eve');
-    game.start(); // starts in night
-
-    const mafia = game.getAlivePlayers().find(p => p.role === 'mafia')!;
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${mafia.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'night_action', payload: {} }));
-    client.ws.send(JSON.stringify({ type: 'get_state' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('game_state');
-  });
-
-  it('handles unknown message type with error', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'unknown_type' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('error');
-  });
-
-  it('handles invalid JSON with error message', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send('not-valid-json{{{');
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('error');
-  });
-
   it('broadcasts player_joined when player connects', async () => {
     const { game, hostPlayer } = gameManager.createGame('Alice');
     const { player: bob } = gameManager.joinGame(game.id, 'Bob');
@@ -343,65 +206,6 @@ describe('WebSocket Server', () => {
     await new Promise(r => setTimeout(r, 50));
 
     expect(gameManager.getGame(gameId)).toBeUndefined();
-  });
-
-  it('handles mark_ready message and broadcasts player_ready', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const { player: bob } = gameManager.joinGame(game.id, 'Bob');
-
-    const aliceClient = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await aliceClient.getNextMessage(); // connected
-
-    const bobClient = await connect(`/?gameId=${game.id}&playerId=${bob.id}`);
-    await bobClient.getNextMessage(); // Bob connected
-    await aliceClient.getNextMessage(); // Alice gets player_joined
-
-    // Bob marks ready
-    bobClient.ws.send(JSON.stringify({ type: 'mark_ready' }));
-    const msg = await aliceClient.getNextMessage();
-    expect(msg.type).toBe('player_ready');
-    const payload = msg.payload as Record<string, unknown>;
-    expect(payload.playerId).toBe(bob.id);
-    expect(payload.readyCount).toBe(1);
-  });
-
-  it('handles mark_ready error when game is active', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    gameManager.joinGame(game.id, 'Bob');
-    gameManager.joinGame(game.id, 'Carol');
-    gameManager.joinGame(game.id, 'Dave');
-    game.start(); // status becomes 'active'
-
-    const client = await connect(`/?gameId=${game.id}&playerId=${hostPlayer.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'mark_ready' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('error');
-  });
-
-  it('handles mark_ready without playerId (no-op)', async () => {
-    const { game } = gameManager.createGame('Alice');
-
-    // Connect without a playerId
-    const client = await connect(`/?gameId=${game.id}`);
-    await client.getNextMessage(); // connected
-
-    client.ws.send(JSON.stringify({ type: 'mark_ready' }));
-    // No-op - verify socket still open by doing get_state
-    client.ws.send(JSON.stringify({ type: 'get_state' }));
-    const msg = await client.getNextMessage();
-    expect(msg.type).toBe('game_state');
-  });
-
-  it('handles message without gameId context silently', async () => {
-    const client = await connect('/');
-    await client.getNextMessage(); // connected (no gameId)
-
-    // Messages without gameId context are ignored
-    client.ws.send(JSON.stringify({ type: 'get_state' }));
-    // No response expected - verify socket is still open
-    expect(client.ws.readyState).toBe(WebSocket.OPEN);
   });
 
   // ── game_started sends per-player state (role visibility) ─────────────────
@@ -636,8 +440,8 @@ describe('WebSocket Server', () => {
   // ── vote_cast broadcast includes the full votes map ────────────────────────
 
   it('vote_cast broadcast includes updated votes map', async () => {
-    const { game, hostPlayer } = gameManager.createGame('Alice');
-    const { player: bob }   = gameManager.joinGame(game.id, 'Bob');
+    const { game, hostPlayer, token: aliceToken } = gameManager.createGame('Alice');
+    const { player: bob, token: bobToken } = gameManager.joinGame(game.id, 'Bob');
     const { player: carol } = gameManager.joinGame(game.id, 'Carol');
     const { player: dave }  = gameManager.joinGame(game.id, 'Dave');
     game.start();
@@ -650,8 +454,12 @@ describe('WebSocket Server', () => {
     await bobClient.getNextMessage();
     await aliceClient.getNextMessage(); // player_joined for bob
 
-    // Bob casts a vote for Carol via WS
-    bobClient.ws.send(JSON.stringify({ type: 'cast_vote', payload: { targetId: carol.id } }));
+    // Bob casts a vote for Carol via REST
+    await fetch(`http://localhost:${port}/games/${game.id}/vote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-player-token': bobToken },
+      body: JSON.stringify({ targetId: carol.id })
+    });
 
     // Alice should receive vote_cast with a votes map
     const voteMsg = await aliceClient.getNextMessage();
@@ -660,7 +468,7 @@ describe('WebSocket Server', () => {
     expect(payload.votes).toBeDefined();
     expect((payload.votes as Record<string, string>)[bob.id]).toBe(carol.id);
 
-    void dave; // suppress unused variable warning
+    void aliceToken; void dave; // suppress unused variable warnings
   });
 
   // ── Grace period / reconnect ────────────────────────────────────────────────
