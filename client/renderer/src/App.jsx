@@ -109,6 +109,7 @@ export default function App() {
       pendingAutoAction.current = null;
       handleSpectate();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers are stable; adding them would require useCallback refactoring
   }, [playerName, gameIdInput]);
 
   const me = useMemo(() => {
@@ -338,6 +339,7 @@ export default function App() {
 
     // Pull any deep link that arrived before the renderer was ready to listen.
     window.mafia.getStartupDeepLink().then(handleDeepLink);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-time IPC listener registration
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────

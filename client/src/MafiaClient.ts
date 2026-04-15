@@ -66,7 +66,7 @@ export class MafiaClient extends EventEmitter {
       this.wsFactory = options.webSocketFactory;
     } else {
       // Use the `ws` package when running in Node.js (Electron main / tests)
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const WS = require('ws') as new (url: string) => WebSocketLike;
       this.wsFactory = (url: string) => new WS(url);
     }
