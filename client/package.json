@@ -19,6 +19,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@mafia/shared": "*",
     "electron": "^27.0.0",
     "i18next": "^25.8.18",
     "react": "^18.3.1",
