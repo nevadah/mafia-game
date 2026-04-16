@@ -4,15 +4,18 @@ import { IncomingMessage } from 'http';
 import { GameManager } from './GameManager';
 import { logger } from './logger';
 import {
-  CreateGameRequest,
-  JoinGameRequest,
-  VoteRequest,
-  NightActionRequest,
-  ReadyRequest,
-  LeaveRequest,
-  SpectateRequest,
-  ServerToClientMessage
-} from './types';
+  CreateGameSchema,
+  JoinGameSchema,
+  SpectateSchema,
+  ReadySchema,
+  StartSchema,
+  VoteSchema,
+  ChatSchema,
+  ResolveSchema,
+  NightActionSchema,
+  LeaveSchema,
+} from './schemas';
+import { ServerToClientMessage } from './types';
 
 /**
  * Mutable reference filled by createWebSocketServer so that REST handlers
@@ -76,6 +79,23 @@ function resolveActorPlayerId(
   return fallbackPlayerId;
 }
 
+/**
+ * Parse and validate a request body against a Zod schema.
+ * Returns the typed data on success, or responds with 400 and returns null.
+ */
+function parseBody<T>(
+  schema: { safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: { message: string }[] } } },
+  body: unknown,
+  res: Response
+): T | null {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    res.status(400).json({ error: result.error.issues[0].message });
+    return null;
+  }
+  return result.data;
+}
+
 export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef) {
   const app = express();
   app.use(express.json());
@@ -87,12 +107,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
 
   // ── POST /games ────────────────────────────────────────────────────────────
   app.post('/games', (req: Request, res: Response) => {
-    const { hostName, settings } = req.body as CreateGameRequest;
-    if (!hostName || typeof hostName !== 'string' || hostName.trim() === '') {
-      return res.status(400).json({ error: 'hostName is required' });
-    }
+    const body = parseBody(CreateGameSchema, req.body, res);
+    if (!body) return;
     try {
-      const { game, hostPlayer, token } = gameManager.createGame(hostName.trim(), settings);
+      const { game, hostPlayer, token } = gameManager.createGame(body.hostName, body.settings);
       return res.status(201).json({
         gameId: game.id,
         playerId: hostPlayer.id,
@@ -147,12 +165,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
 
   // ── POST /games/:gameId/join ───────────────────────────────────────────────
   app.post('/games/:gameId/join', (req: Request, res: Response) => {
-    const { playerName } = req.body as JoinGameRequest;
-    if (!playerName || typeof playerName !== 'string' || playerName.trim() === '') {
-      return res.status(400).json({ error: 'playerName is required' });
-    }
+    const body = parseBody(JoinGameSchema, req.body, res);
+    if (!body) return;
     try {
-      const { game, player, token } = gameManager.joinGame(req.params.gameId, playerName.trim());
+      const { game, player, token } = gameManager.joinGame(req.params.gameId, body.playerName);
       broadcast(game.id, {
         type: 'player_joined',
         payload: { playerId: player.id, playerName: player.name, state: game.toState() }
@@ -173,15 +189,13 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
 
   // ── POST /games/:gameId/spectate ──────────────────────────────────────────
   app.post('/games/:gameId/spectate', (req: Request, res: Response) => {
-    const { spectatorName } = req.body as SpectateRequest;
-    if (!spectatorName || typeof spectatorName !== 'string' || spectatorName.trim() === '') {
-      return res.status(400).json({ error: 'spectatorName is required' });
-    }
+    const body = parseBody(SpectateSchema, req.body, res);
+    if (!body) return;
     try {
-      const { game, spectatorId, token } = gameManager.joinAsSpectator(req.params.gameId, spectatorName.trim());
+      const { game, spectatorId, token } = gameManager.joinAsSpectator(req.params.gameId, body.spectatorName);
       broadcast(game.id, {
         type: 'spectator_joined',
-        payload: { spectatorId, spectatorName: spectatorName.trim(), state: game.toState() }
+        payload: { spectatorId, spectatorName: body.spectatorName, state: game.toState() }
       });
       return res.status(200).json({
         spectatorId,
@@ -205,8 +219,9 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId } = req.body as ReadyRequest;
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(ReadySchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       game.markPlayerReady(actorId);
       const allReady = game.areAllPlayersReady();
       broadcast(game.id, {
@@ -232,8 +247,9 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId } = req.body as ReadyRequest;
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(ReadySchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       game.markPlayerNotReady(actorId);
       broadcast(game.id, {
         type: 'player_ready',
@@ -258,8 +274,9 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId } = req.body as { playerId?: string };
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(StartSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       if (actorId !== game.hostId) {
         return res.status(403).json({ error: 'Only the host can start the game' });
       }
@@ -284,11 +301,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { voterId, targetId } = req.body as VoteRequest;
-      if (!targetId) {
-        return res.status(400).json({ error: 'targetId is required' });
-      }
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, voterId);
+      const body = parseBody(VoteSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.voterId);
+      const { targetId } = body;
       game.castVote(actorId, targetId);
       broadcast(game.id, {
         type: 'vote_cast',
@@ -309,12 +325,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { text, playerId } = req.body as { text?: string; playerId?: string };
-      if (!text || typeof text !== 'string') {
-        return res.status(400).json({ error: 'text is required' });
-      }
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
-      const message = game.addChatMessage(actorId, text);
+      const body = parseBody(ChatSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
+      const message = game.addChatMessage(actorId, body.text);
       broadcast(game.id, {
         type: 'chat_message',
         payload: message
@@ -334,8 +348,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId, force } = req.body as { playerId?: string; force?: boolean };
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(ResolveSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
+      const { force } = body;
       if (actorId !== game.hostId) {
         return res.status(403).json({ error: 'Only the host can resolve votes' });
       }
@@ -389,12 +405,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId, targetId } = req.body as NightActionRequest;
-      if (!targetId) {
-        return res.status(400).json({ error: 'targetId is required' });
-      }
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
-      game.submitNightAction(actorId, targetId);
+      const body = parseBody(NightActionSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
+      game.submitNightAction(actorId, body.targetId);
       return res.json({ state: game.toState(actorId) });
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 400;
@@ -410,8 +424,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId, force } = req.body as { playerId?: string; force?: boolean };
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(ResolveSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
+      const { force } = body;
       if (actorId !== game.hostId) {
         return res.status(403).json({ error: 'Only the host can resolve night actions' });
       }
@@ -465,8 +481,9 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     }
 
     try {
-      const { playerId } = req.body as LeaveRequest;
-      const actorId = resolveActorPlayerId(req, gameManager, game.id, playerId);
+      const body = parseBody(LeaveSchema, req.body, res);
+      if (!body) return;
+      const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       const { deletedGame } = gameManager.leaveGame(game.id, actorId);
 
       if (!deletedGame) {
