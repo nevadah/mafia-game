@@ -143,5 +143,8 @@
   "statusSpectatingGame": "Uniéndose como espectador...",
   "statusSpectateLinkLoaded": "Enlace de espectador cargado para el juego {{gameId}}.",
   "statusSpectateCopied": "Enlace de espectador copiado.",
-  "statusNoSpectateLink": "No hay enlace de espectador disponible."
+  "statusNoSpectateLink": "No hay enlace de espectador disponible.",
+
+  "statusReconnecting": "Conexi\u00f3n perdida \u2014 reconectando (intento {{attempt}} de {{maxAttempts}})\u2026",
+  "statusDisconnected": "Conexi\u00f3n perdida. Volviendo al men\u00fa."
 }

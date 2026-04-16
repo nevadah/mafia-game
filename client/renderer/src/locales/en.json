@@ -143,5 +143,8 @@
   "statusSpectatingGame": "Joining as spectator...",
   "statusSpectateLinkLoaded": "Spectate link loaded for game {{gameId}}.",
   "statusSpectateCopied": "Spectate link copied.",
-  "statusNoSpectateLink": "No spectate link available."
+  "statusNoSpectateLink": "No spectate link available.",
+
+  "statusReconnecting": "Connection lost \u2014 reconnecting (attempt {{attempt}} of {{maxAttempts}})\u2026",
+  "statusDisconnected": "Connection lost. Returning to menu."
 }

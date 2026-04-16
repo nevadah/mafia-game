@@ -304,6 +304,13 @@ export default function App() {
     window.mafia.onServerError((payload) =>
       showStatus(t('statusServerError', { message: payload?.message || 'unknown' }), true)
     );
+    window.mafia.onReconnecting(({ attempt, maxAttempts }) =>
+      showStatus(t('statusReconnecting', { attempt, maxAttempts }), true)
+    );
+    window.mafia.onDisconnected(() => {
+      showStatus(t('statusDisconnected'), true);
+      resetGameUi();
+    });
     function handleDeepLink(payload) {
       if (!payload) return;
       if (currentStateRef.current) {
