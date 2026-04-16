@@ -96,6 +96,8 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('chat_message', (p) => mainWindow?.webContents.send('mafia:chat_message', p));
   c.on('spectator_joined', (p) => mainWindow?.webContents.send('mafia:spectator_joined', p));
   c.on('spectator_left', (p) => mainWindow?.webContents.send('mafia:spectator_left', p));
+  c.on('reconnecting', (p) => mainWindow?.webContents.send('mafia:reconnecting', p));
+  c.on('disconnected', () => mainWindow?.webContents.send('mafia:disconnected'));
 }
 
 const multiInstance = Boolean(process.env.MAFIA_MULTI_INSTANCE);

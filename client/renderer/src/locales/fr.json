@@ -143,5 +143,8 @@
   "statusSpectatingGame": "Rejoindre en tant que spectateur...",
   "statusSpectateLinkLoaded": "Lien spectateur chargé pour la partie {{gameId}}.",
   "statusSpectateCopied": "Lien spectateur copié.",
-  "statusNoSpectateLink": "Aucun lien spectateur disponible."
+  "statusNoSpectateLink": "Aucun lien spectateur disponible.",
+
+  "statusReconnecting": "Connexion perdue \u2014 reconnexion en cours (tentative {{attempt}} sur {{maxAttempts}})\u2026",
+  "statusDisconnected": "Connexion perdue. Retour au menu."
 }

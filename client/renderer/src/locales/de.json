@@ -143,5 +143,8 @@
   "statusSpectatingGame": "Als Zuschauer beitreten...",
   "statusSpectateLinkLoaded": "Zuschauerlink für Spiel {{gameId}} geladen.",
   "statusSpectateCopied": "Zuschauerlink kopiert.",
-  "statusNoSpectateLink": "Kein Zuschauerlink verfügbar."
+  "statusNoSpectateLink": "Kein Zuschauerlink verfügbar.",
+
+  "statusReconnecting": "Verbindung unterbrochen \u2014 Wiederverbindung (Versuch {{attempt}} von {{maxAttempts}})\u2026",
+  "statusDisconnected": "Verbindung verloren. Zur\u00fcck zum Men\u00fc."
 }

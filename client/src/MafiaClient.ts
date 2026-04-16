@@ -33,6 +33,7 @@ export interface MafiaClientOptions {
  *   'game_started'     (payload)
  *   'game_ended'       (payload)
  *   'server_error'     (payload)
+ *   'reconnecting'     ({ attempt: number, maxAttempts: number })
  *   'disconnected'     ()
  */
 export class MafiaClient extends EventEmitter {
@@ -449,6 +450,10 @@ export class MafiaClient extends EventEmitter {
 
         if (this._reconnectAttempts < MafiaClient.MAX_RECONNECT_ATTEMPTS) {
           this._reconnectAttempts++;
+          this.emit('reconnecting', {
+            attempt: this._reconnectAttempts,
+            maxAttempts: MafiaClient.MAX_RECONNECT_ATTEMPTS,
+          });
           setTimeout(() => {
             this._openWebSocket().catch(() => {
               // If retry also fails, fall through to final disconnect below

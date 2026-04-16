@@ -45,5 +45,9 @@ contextBridge.exposeInMainWorld('mafia', {
   onSpectatorJoined: (cb: (payload: unknown) => void) =>
     ipcRenderer.on('mafia:spectator_joined', (_e, p) => cb(p)),
   onSpectatorLeft: (cb: (payload: unknown) => void) =>
-    ipcRenderer.on('mafia:spectator_left', (_e, p) => cb(p))
+    ipcRenderer.on('mafia:spectator_left', (_e, p) => cb(p)),
+  onReconnecting: (cb: (payload: { attempt: number; maxAttempts: number }) => void) =>
+    ipcRenderer.on('mafia:reconnecting', (_e, p) => cb(p)),
+  onDisconnected: (cb: () => void) =>
+    ipcRenderer.on('mafia:disconnected', () => cb())
 });
