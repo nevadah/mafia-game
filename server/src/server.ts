@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { GameManager } from './GameManager';
+import { logger } from './logger';
 import {
   CreateGameRequest,
   JoinGameRequest,
@@ -488,7 +489,7 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
 
   // ── Error handler ──────────────────────────────────────────────────────────
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error(err.stack);
+    logger.error({ err }, 'unhandled server error');
     res.status(500).json({ error: 'Internal server error' });
   });
 
@@ -581,6 +582,9 @@ export function createWebSocketServer(
         if (pending !== undefined) {
           clearTimeout(pending);
           disconnectTimers.delete(timerKey);
+          logger.info({ gameId, playerId, isSpectator }, 'ws reconnected within grace period');
+        } else {
+          logger.info({ gameId, playerId, isSpectator }, 'ws connected');
         }
 
         if (isSpectator) {
@@ -619,6 +623,7 @@ export function createWebSocketServer(
         const timerKey = `${gameId}:${playerId}`;
 
         // Don't remove immediately — give the client a window to reconnect.
+        logger.debug({ gameId, playerId, isSpectator, gracePeriodMs }, 'ws disconnected — grace timer started');
         const timer = setTimeout(() => {
           disconnectTimers.delete(timerKey);
           const game = gameManager.getGame(gameId);

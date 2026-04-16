@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Game } from './Game';
 import { Player } from './Player';
+import { logger } from './logger';
 import { GameSettings } from './types';
 
 interface Session {
@@ -27,6 +28,7 @@ export class GameManager {
     this.games.set(game.id, game);
 
     const token = this.issueSession(game.id, hostId);
+    logger.info({ gameId: game.id, hostId, hostName }, 'game created');
     return { game, hostPlayer, token };
   }
 
@@ -47,7 +49,9 @@ export class GameManager {
       this.revokeSessionsForPlayer(gameId, spectator.id);
     }
 
-    return this.games.delete(gameId);
+    const deleted = this.games.delete(gameId);
+    if (deleted) logger.info({ gameId }, 'game deleted');
+    return deleted;
   }
 
   joinGame(gameId: string, playerName: string): { game: Game; player: Player; token: string } {
@@ -60,6 +64,7 @@ export class GameManager {
     game.addPlayer(player);
 
     const token = this.issueSession(gameId, player.id);
+    logger.info({ gameId, playerId: player.id, playerName }, 'player joined');
     return { game, player, token };
   }
 
@@ -79,6 +84,7 @@ export class GameManager {
     // Host departure closes the room until host migration is implemented.
     if (playerId === game.hostId || game.getPlayerCount() === 0) {
       this.deleteGame(gameId);
+      logger.info({ gameId, playerId, reason: playerId === game.hostId ? 'host left' : 'last player' }, 'player left');
       return { deletedGame: true };
     }
 
@@ -86,6 +92,7 @@ export class GameManager {
       game.checkWinCondition();
     }
 
+    logger.info({ gameId, playerId }, 'player left');
     return { deletedGame: false };
   }
 
@@ -99,6 +106,7 @@ export class GameManager {
     game.addSpectator(spectatorId, spectatorName);
 
     const token = this.issueSession(gameId, spectatorId, true);
+    logger.info({ gameId, spectatorId, spectatorName }, 'spectator joined');
     return { game, spectatorId, token };
   }
 
@@ -110,6 +118,7 @@ export class GameManager {
 
     game.removeSpectator(spectatorId);
     this.revokeSessionsForPlayer(gameId, spectatorId);
+    logger.info({ gameId, spectatorId }, 'spectator left');
   }
 
   listGames(): Game[] {
@@ -143,6 +152,7 @@ export class GameManager {
       }
     }
 
+    if (removed > 0) logger.info({ removed, maxIdleMs }, 'pruned stale waiting games');
     return removed;
   }
 

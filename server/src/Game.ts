@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Player } from './Player';
+import { logger } from './logger';
 import {
   GamePhase,
   GameStatus,
@@ -204,6 +205,7 @@ export class Game {
     this.phase = 'night';
     this.round = 0;
     this.touch();
+    logger.info({ gameId: this.id, playerCount: this.players.size }, 'game started');
   }
 
   private assignRoles(): void {
@@ -495,6 +497,7 @@ export class Game {
     }
 
     this.touch();
+    logger.debug({ gameId: this.id, phase: this.phase, round: this.round }, 'phase advanced');
   }
 
   // ── Win condition ──────────────────────────────────────────────────────────
@@ -509,6 +512,7 @@ export class Game {
       this.status = 'ended';
       this.phase = 'ended';
       this.touch();
+      logger.info({ gameId: this.id, winner: 'town' }, 'game ended');
       return 'town';
     }
 
@@ -517,6 +521,7 @@ export class Game {
       this.status = 'ended';
       this.phase = 'ended';
       this.touch();
+      logger.info({ gameId: this.id, winner: 'mafia' }, 'game ended');
       return 'mafia';
     }
 
