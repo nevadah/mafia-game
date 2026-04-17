@@ -60,6 +60,8 @@ export interface GameState {
   hostId: string;
   votes: Record<string, string>;
   nightActions: Record<string, string>;
+  nightActorCount: number;
+  nightSubmittedCount: number;
   eliminatedThisRound?: string;
   doctorProtectedThisRound?: string | null;
   investigatedThisRound?: { target: string; result: Role } | null;

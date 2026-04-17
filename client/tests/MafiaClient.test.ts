@@ -14,6 +14,8 @@ function makeGameState(overrides: Partial<GameState> = {}): GameState {
     hostId: 'p1',
     votes: {},
     nightActions: {},
+    nightActorCount: 0,
+    nightSubmittedCount: 0,
     settings: {
       minPlayers: 4,
       maxPlayers: 12,
@@ -1093,6 +1095,44 @@ describe('MafiaClient — chat_message WebSocket event', () => {
     client.on('state_update', (s) => stateUpdates.push(s));
     ws.receive({ type: 'chat_message', payload: { id: 'm1', senderId: 'p1', senderName: 'Alice', text: 'hi', timestamp: 1000 } });
     expect(stateUpdates).toHaveLength(0);
+  });
+});
+
+describe('MafiaClient — night_action_submitted WebSocket event', () => {
+  it('emits night_action_submitted event', async () => {
+    const { client, ws } = await makeConnectedClient();
+    const events: unknown[] = [];
+    client.on('night_action_submitted', (p) => events.push(p));
+
+    ws.receive({ type: 'night_action_submitted', payload: { submittedCount: 1, totalCount: 3 } });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ submittedCount: 1, totalCount: 3 });
+  });
+
+  it('updates nightSubmittedCount and nightActorCount in gameState and emits state_update', async () => {
+    const { client, ws } = await makeConnectedClient();
+    const updates: GameState[] = [];
+    client.on('state_update', (s) => updates.push(s as GameState));
+
+    ws.receive({ type: 'night_action_submitted', payload: { submittedCount: 2, totalCount: 3 } });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0].nightSubmittedCount).toBe(2);
+    expect(updates[0].nightActorCount).toBe(3);
+    expect(client.gameState?.nightSubmittedCount).toBe(2);
+    expect(client.gameState?.nightActorCount).toBe(3);
+  });
+
+  it('does not emit state_update when gameState is not set', async () => {
+    const { client, ws } = await makeConnectedClient();
+    (client as unknown as { _gameState: undefined })._gameState = undefined;
+    const updates: unknown[] = [];
+    client.on('state_update', (s) => updates.push(s));
+
+    ws.receive({ type: 'night_action_submitted', payload: { submittedCount: 1, totalCount: 2 } });
+
+    expect(updates).toHaveLength(0);
   });
 });
 

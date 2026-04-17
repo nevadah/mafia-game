@@ -65,6 +65,8 @@
   "selectProtect": "Selecciona un jugador para proteger",
   "selectInvestigate": "Selecciona un jugador para investigar",
   "actionSubmitted": "Acción enviada. Esperando resolución de la noche\u2026",
+  "nightActionsLabel": "Acciones nocturnas",
+  "nightActionsProgress": "{{submitted}} de {{total}} acciones nocturnas enviadas.",
   "eliminateAction": "Eliminar",
   "protectAction": "Proteger",
   "investigateAction": "Investigar",

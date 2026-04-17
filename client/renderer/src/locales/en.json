@@ -65,6 +65,8 @@
   "selectProtect": "Select a player to protect",
   "selectInvestigate": "Select a player to investigate",
   "actionSubmitted": "Action submitted. Waiting for night to resolve\u2026",
+  "nightActionsLabel": "Night Actions",
+  "nightActionsProgress": "{{submitted}} of {{total}} night actions submitted.",
   "eliminateAction": "Eliminate",
   "protectAction": "Protect",
   "investigateAction": "Investigate",

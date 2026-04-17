@@ -58,6 +58,7 @@ Connection URL:
 - `chat_message` — broadcast to all connected clients whenever a player posts a chat message
 - `spectator_joined` — broadcast when a spectator connects
 - `spectator_left` — broadcast when a spectator disconnects or leaves
+- `night_action_submitted` — broadcast after each night action is submitted; payload `{ submittedCount, totalCount }`. Counts only — actor identity is never revealed.
 - `error`
 
 ## Electron IPC (`window.mafia`)
@@ -96,6 +97,7 @@ Event subscriptions:
 - `onChatMessage`
 - `onSpectatorJoined`
 - `onSpectatorLeft`
+- `onNightActionSubmitted` — payload `{ submittedCount, totalCount }`
 - `onReconnecting` — fired on each reconnect attempt; payload `{ attempt, maxAttempts }`
 - `onDisconnected` — fired when all reconnect attempts are exhausted or the client disconnects intentionally
 - `onDeepLink`

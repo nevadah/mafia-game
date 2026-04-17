@@ -561,6 +561,8 @@ export class Game {
       hostId: this.hostId,
       votes: this.getVotes(),
       nightActions: {},
+      nightActorCount: this.getNightActionActorIds().length,
+      nightSubmittedCount: this.getNightActionActorIds().length - this.getMissingNightActionPlayerIds().length,
       eliminatedThisRound: this.eliminatedThisRound,
       doctorProtectedThisRound: requestingPlayer?.role === 'doctor'
         ? (this.doctorProtectedThisRound ?? null)

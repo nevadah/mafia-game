@@ -32,6 +32,7 @@ const mockMafia = {
   resolveNight: jest.fn(),
   leaveGame: jest.fn(),
   leaveSpectator: jest.fn(),
+  onNightActionSubmitted: jest.fn(),
   disconnect: jest.fn()
 };
 
@@ -64,6 +65,8 @@ function makeNightState({ myRole = 'mafia', investigatedThisRound = null, overri
     })),
     votes: {},
     nightActions: {},
+    nightActorCount: 3,
+    nightSubmittedCount: 3,
     investigatedThisRound,
     eliminatedThisRound: undefined,
     settings: BASE_SETTINGS,

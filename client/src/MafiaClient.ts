@@ -557,6 +557,19 @@ export class MafiaClient extends EventEmitter {
         this.emit(msg.type, msg.payload);
         break;
       }
+      case 'night_action_submitted': {
+        const p = msg.payload as { submittedCount: number; totalCount: number } | undefined;
+        if (p && this._gameState) {
+          this._gameState = {
+            ...this._gameState,
+            nightSubmittedCount: p.submittedCount,
+            nightActorCount: p.totalCount,
+          };
+          this.emit('state_update', this._gameState);
+        }
+        this.emit('night_action_submitted', msg.payload);
+        break;
+      }
       case 'chat_message': {
         const p = msg.payload as ChatMessage | undefined;
         if (p && this._gameState) {
