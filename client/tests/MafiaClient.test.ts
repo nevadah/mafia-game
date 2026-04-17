@@ -1428,7 +1428,7 @@ describe('MafiaClient — chat_message WebSocket event', () => {
   });
 
   it('appends chat message to gameState.messages and emits state_update', async () => {
-    const { client, ws, state } = await makeConnectedClient();
+    const { client, ws } = await makeConnectedClient();
     const updates: unknown[] = [];
     client.on('state_update', (s) => updates.push(s));
 
@@ -1436,7 +1436,7 @@ describe('MafiaClient — chat_message WebSocket event', () => {
     ws.receive({ type: 'chat_message', payload: chatMsg });
 
     expect(updates).toHaveLength(1);
-    const updatedState = updates[0] as typeof state;
+    const updatedState = updates[0] as GameState;
     expect(updatedState.messages).toHaveLength(1);
     expect(updatedState.messages![0]).toEqual(chatMsg);
   });
@@ -1459,9 +1459,9 @@ describe('MafiaClient — chat_message WebSocket event', () => {
 
 describe('MafiaClient — reconnect counter reset', () => {
   it('resets _reconnectAttempts to 0 when reconnect succeeds', async () => {
-    const state = makeGameState();
+    const _state = makeGameState();
     // Responses: createGame, then connect attempts use WS not fetch
-    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state: _state } }]);
 
     // ws1 = first connection (succeeds), ws2 = reconnect attempt (will succeed)
     const ws1 = new MockWebSocket();
@@ -1477,7 +1477,7 @@ describe('MafiaClient — reconnect counter reset', () => {
 
     await client.createGame('Alice');
     const connectPromise = client.connect();
-    ws1.receive({ type: 'connected', payload: { state } });
+    ws1.receive({ type: 'connected', payload: { state: _state } });
     await connectPromise;
 
     // Simulate disconnect to trigger one reconnect attempt
@@ -1487,7 +1487,7 @@ describe('MafiaClient — reconnect counter reset', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     // Now resolve the reconnect by sending 'connected' on ws2
-    ws2.receive({ type: 'connected', payload: { state } });
+    ws2.receive({ type: 'connected', payload: { state: _state } });
 
     // Yield again so the onConnectedOnce handler runs
     await new Promise<void>(resolve => setTimeout(resolve, 0));
