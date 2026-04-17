@@ -143,7 +143,11 @@ export default function App() {
       const result = await window.mafia.joinGame(serverUrl.trim(), gameIdInput.trim(), playerName.trim());
       onConnected(result);
     } catch (err) {
-      showStatus(`Error: ${err.message}`, true);
+      if (err.message === 'Game is full') {
+        showStatus(t('statusGameFull'), true);
+      } else {
+        showStatus(`Error: ${err.message}`, true);
+      }
     }
   }, [playerName, gameIdInput, serverUrl, t, showStatus, onConnected]);
 

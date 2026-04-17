@@ -141,21 +141,26 @@ export default function DayPhase({
           }
           <div ref={chatEndRef} />
         </div>
-        {me?.isAlive && (
+        {me?.isAlive ? (
           <div className="chat-input-row">
-            <input
-              className="chat-input"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && chatInput.trim()) {
-                  runAction('', () => window.mafia.sendChat(chatInput.trim()));
-                  setChatInput('');
-                }
-              }}
-              placeholder={t('chatPlaceholder')}
-              maxLength={200}
-            />
+            <div className="chat-input-wrap">
+              <input
+                className="chat-input"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && chatInput.trim()) {
+                    runAction('', () => window.mafia.sendChat(chatInput.trim()));
+                    setChatInput('');
+                  }
+                }}
+                placeholder={t('chatPlaceholder')}
+                maxLength={200}
+              />
+              <span className={`chat-char-count${chatInput.length >= 180 ? ' chat-char-count-warn' : ''}`}>
+                {chatInput.length}/200
+              </span>
+            </div>
             <button
               className="chat-send-btn"
               disabled={!chatInput.trim()}
@@ -168,6 +173,8 @@ export default function DayPhase({
               {t('chatSend')}
             </button>
           </div>
+        ) : (
+          me && <p className="chat-dead-hint">{t('chatDeadHint')}</p>
         )}
       </div>
 
