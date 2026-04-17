@@ -90,9 +90,9 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 ## Testing
 
 - Jest + ts-jest in both workspaces.
-- 80% line/function/statement coverage enforced; 70% branch.
+- Coverage thresholds: 80% line/function/statement for both workspaces; branch coverage is 70% for `server/` and 80% for `client/`.
 - Client integration tests spin up a live server (global setup/teardown).
-- **CI fails on any warnings or deprecations in test output.** Keep test logs clean.
+- **CI fails on any warnings, deprecations, or ESLint errors.** Keep test and lint output clean. Run `npm run lint` before pushing.
 
 ## Typical Change Workflow
 
@@ -106,6 +106,13 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 
 Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC bridge, and renderer call sites.
 
+## Branch Hygiene
+
+Before starting a new branch:
+
+1. **Verify the previous PR is merged** — check with `gh pr list` or `git log origin/main`. Do not assume a PR merged because it was opened; confirm it.
+2. **Pull from main** — always branch from an up-to-date main. A stale branch divergence can cause bug fixes from a recently merged PR to be absent, requiring manual re-application of changes.
+
 ## Important Constraints
 
 - Do not introduce persistence assumptions unless explicitly requested.
@@ -115,6 +122,7 @@ Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC
 - Tie behavior: day vote tie → no elimination; night mafia vote tie → no kill.
 - WebSocket disconnect starts a 30-second grace timer before removing the player. If the client reconnects with the same token within that window, the timer is cancelled. An explicit leave (`POST /leave`) is immediate. Closing the Electron window mid-game removes the player after the grace period.
 - Host leaving or disconnecting deletes the game.
+- Spectators join via `POST /games/:gameId/spectate` and leave via `POST /games/:gameId/spectate-leave`. Spectator tokens are rejected with `403` by all player-action endpoints. Spectators are not counted in `getPlayerCount()` and do not affect game mechanics.
 
 ## Documentation
 

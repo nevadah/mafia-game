@@ -11,6 +11,7 @@ Base URL: `http://localhost:3000`
 - `GET /games/:gameId`
 - `POST /games/:gameId/join`
 - `POST /games/:gameId/spectate` — join as a read-only spectator; returns `{ spectatorId, token, state }`. Spectator tokens are rejected by all player-action endpoints with `403`.
+- `POST /games/:gameId/spectate-leave` — leave as a spectator; requires a spectator token (`x-player-token`). Returns `{ ok: true }`. Player tokens are rejected with `403`.
 
 ### Authenticated Gameplay
 
@@ -77,6 +78,7 @@ Actions exposed by preload:
 - `resolveNight(force?)`
 - `sendChat(text)`
 - `leaveGame()`
+- `leaveSpectator()` — leave as a spectator; calls `POST /spectate-leave` and clears client state
 - `disconnect()`
 - `getStartupDeepLink()` — pulls any deep-link payload buffered before the renderer was ready
 
@@ -94,6 +96,8 @@ Event subscriptions:
 - `onChatMessage`
 - `onSpectatorJoined`
 - `onSpectatorLeft`
+- `onReconnecting` — fired on each reconnect attempt; payload `{ attempt, maxAttempts }`
+- `onDisconnected` — fired when all reconnect attempts are exhausted or the client disconnects intentionally
 - `onDeepLink`
 
 ### Deep Link Format
