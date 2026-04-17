@@ -36,6 +36,21 @@ class HttpError extends Error {
   }
 }
 
+// ── Per-player chat rate limiter (sliding window) ─────────────────────────────
+
+const CHAT_RATE_LIMIT = 10;          // max messages
+const CHAT_RATE_WINDOW_MS = 10_000;  // per 10 seconds
+const _chatTimestamps = new Map<string, number[]>();
+
+function checkChatRateLimit(token: string): boolean {
+  const now = Date.now();
+  const recent = (_chatTimestamps.get(token) ?? []).filter(t => now - t < CHAT_RATE_WINDOW_MS);
+  if (recent.length >= CHAT_RATE_LIMIT) return false;
+  recent.push(now);
+  _chatTimestamps.set(token, recent);
+  return true;
+}
+
 function authTokenFromRequest(req: Request): string | undefined {
   const header = req.headers['x-player-token'];
   if (Array.isArray(header)) {
@@ -370,6 +385,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     try {
       const body = parseBody(ChatSchema, req.body, res);
       if (!body) return;
+      const token = authTokenFromRequest(req);
+      if (token && !checkChatRateLimit(token)) {
+        return res.status(429).json({ error: 'Too many messages. Slow down.' });
+      }
       const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       const message = game.addChatMessage(actorId, body.text);
       broadcast(game.id, {
