@@ -53,6 +53,7 @@ npm run simulate -- 6     # 6 players
 - `client/renderer/src/App.jsx`
 4. For new UI strings: add to `client/renderer/src/locales/en.json` first, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
 5. Add/update tests in corresponding workspace test folders.
+6. Before opening a PR: audit `CLAUDE.md` and `docs/` for anything the branch has made stale or undocumented. Update inline — don't defer to a follow-up.
 
 ## AI Agent Notes
 

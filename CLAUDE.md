@@ -103,6 +103,7 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 5. UI → edit or add a component in `client/renderer/src/components/`; wire it into `client/renderer/src/App.jsx` if it's a new phase-level component
 6. New UI strings → add key + English value to `client/renderer/src/locales/en.json`, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
 7. Add/update tests in the corresponding workspace `tests/` folder.
+8. **Before opening a PR**: audit `CLAUDE.md` and `docs/` for anything the branch has made stale or left undocumented — new endpoints, changed constraints, new IPC methods, updated workflows, etc. Update inline rather than deferring to a follow-up PR.
 
 Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC bridge, and renderer call sites.
 
