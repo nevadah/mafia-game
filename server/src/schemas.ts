@@ -5,8 +5,13 @@ import { z } from 'zod';
 const nameField = z
   .string('name is required')
   .trim()
-  .min(1, 'name cannot be empty')
-  .max(32, 'name must be 32 characters or fewer');
+  // eslint-disable-next-line no-control-regex
+  .transform(s => s.replace(/[\u0000-\u001F\u007F<>]/g, ''))
+  .pipe(
+    z.string()
+      .min(1, 'name cannot be empty')
+      .max(32, 'name must be 32 characters or fewer')
+  );
 
 const optionalPlayerId = z.string().optional();
 

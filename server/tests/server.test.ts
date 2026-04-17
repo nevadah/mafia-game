@@ -587,5 +587,76 @@ describe('REST API', () => {
       const res = await request(app).post('/games/unknown/chat').send({ text: 'hi' });
       expect(res.status).toBe(404);
     });
+
+    it('returns 429 when a player sends too many messages in the rate window', async () => {
+      const { gameId, hostId } = await setupDayGame();
+      const createRes = await request(app).post('/games').send({ hostName: 'Temp' });
+      const token = createRes.body.token as string;
+      // Send 10 messages (the limit) — all should succeed
+      for (let i = 0; i < 10; i++) {
+        const r = await request(app)
+          .post(`/games/${gameId}/chat`)
+          .set('x-player-token', token)
+          .send({ playerId: hostId, text: `msg ${i}` });
+        // Token belongs to a different game so it won't resolve actorId, but
+        // the rate-limit check happens before auth so we get 403 not 429 once
+        // the limit fires. Use the host's own token instead.
+        void r;
+      }
+      // Use the real host token: create game and get its token
+      const hostCreateRes = await request(app).post('/games').send({ hostName: 'RateHost' });
+      const hostToken = hostCreateRes.body.token as string;
+      const rateGameId = hostCreateRes.body.gameId as string;
+      for (const name of ['P2', 'P3', 'P4']) {
+        await request(app).post(`/games/${rateGameId}/join`).send({ playerName: name });
+      }
+      const hostPlayerId = hostCreateRes.body.playerId as string;
+      await request(app).post(`/games/${rateGameId}/start`).send({ playerId: hostPlayerId });
+      await request(app).post(`/games/${rateGameId}/resolve-night`).send({ playerId: hostPlayerId, force: true });
+      // Send 10 messages — should all succeed
+      for (let i = 0; i < 10; i++) {
+        const r = await request(app)
+          .post(`/games/${rateGameId}/chat`)
+          .set('x-player-token', hostToken)
+          .send({ text: `msg ${i}` });
+        expect(r.status).toBe(200);
+      }
+      // 11th message should be rate-limited
+      const limited = await request(app)
+        .post(`/games/${rateGameId}/chat`)
+        .set('x-player-token', hostToken)
+        .send({ text: 'one too many' });
+      expect(limited.status).toBe(429);
+      expect(limited.body.error).toMatch(/too many messages/i);
+    });
+  });
+
+  describe('POST /games (name sanitization)', () => {
+    it('strips HTML angle brackets from hostName', async () => {
+      const res = await request(app).post('/games').send({ hostName: '<Alice>' });
+      expect(res.status).toBe(201);
+      expect(res.body.state.players[0].name).toBe('Alice');
+    });
+
+    it('strips control characters from hostName', async () => {
+      const res = await request(app).post('/games').send({ hostName: 'Ali\u0000ce' });
+      expect(res.status).toBe(201);
+      expect(res.body.state.players[0].name).toBe('Alice');
+    });
+
+    it('returns 400 when hostName is only strippable characters', async () => {
+      const res = await request(app).post('/games').send({ hostName: '<>' });
+      expect(res.status).toBe(400);
+    });
+
+    it('strips HTML angle brackets from playerName on join', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId } = createRes.body;
+      const joinRes = await request(app)
+        .post(`/games/${gameId}/join`)
+        .send({ playerName: '<Bob>' });
+      expect(joinRes.status).toBe(200);
+      expect(joinRes.body.state.players[1].name).toBe('Bob');
+    });
   });
 });
