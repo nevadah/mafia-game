@@ -56,7 +56,17 @@
 - Leave (`POST /games/:gameId/leave`) removes player from game and sessions immediately. Broadcasts `player_left` to remaining players.
 - If host leaves or disconnects, game is deleted (host migration is not implemented). No `player_left` broadcast is sent when the game is deleted.
 
-## 7. State Visibility Rules
+## 7. Spectator Flow
+
+1. Any client can join any game as a spectator at any phase (lobby, active, or ended) via `POST /games/:gameId/spectate`, passing a `spectatorName`.
+2. Server returns `{ spectatorId, token, state }`. The token is a spectator token and is bound to `{ gameId, spectatorId, isSpectator: true }` in the session store.
+3. Spectator connects to the WebSocket with their token and receives the same public-view state updates as players.
+4. Spectator tokens are rejected with `403` by all player-action endpoints (`/ready`, `/unready`, `/start`, `/vote`, `/chat`, `/night-action`, `/resolve-votes`, `/resolve-night`).
+5. To leave, the spectator calls `POST /games/:gameId/spectate-leave` with their token. Server removes the spectator, broadcasts `spectator_left`, and the client clears its session. Player tokens used on this endpoint are rejected with `403`.
+6. Spectators are not counted in `getPlayerCount()` and do not affect readiness checks, role assignment, win conditions, or resolve gating.
+7. If the game is deleted (host leaves), spectator sessions are revoked along with player sessions.
+
+## 8. State Visibility Rules
 
 - During active game, role is visible to that player only.
 - At game end, all roles are visible to all players.

@@ -53,6 +53,7 @@ npm run simulate -- 6     # 6 players
 - `client/renderer/src/App.jsx`
 4. For new UI strings: add to `client/renderer/src/locales/en.json` first, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
 5. Add/update tests in corresponding workspace test folders.
+6. Before opening a PR: audit `CLAUDE.md` and `docs/` for anything the branch has made stale or undocumented. Update inline — don't defer to a follow-up.
 
 ## AI Agent Notes
 
@@ -64,6 +65,8 @@ npm run simulate -- 6     # 6 players
 - preload/main IPC bridge
 - renderer invocation sites
 - Avoid introducing persistence assumptions unless explicitly requested.
+- Run `npm run lint` before pushing. CI fails on ESLint errors as well as test failures.
+- Before starting a new branch, verify the previous PR is actually merged (`gh pr list` or `git log origin/main`) and pull from main. A divergent branch may be missing recently merged fixes.
 
 ## High-Value Verification Targets
 
@@ -72,6 +75,7 @@ npm run simulate -- 6     # 6 players
 - Resolve gating behavior with and without `force`.
 - Tie behavior in day votes and mafia night votes.
 - Leave-game behavior and host-leave deletion.
+- Spectator token rejection: spectator tokens must be refused by all player-action endpoints with `403`, and player tokens must be refused by `spectate-leave` with `403`.
 
 ## Known Constraints
 
