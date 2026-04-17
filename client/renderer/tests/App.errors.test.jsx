@@ -137,6 +137,17 @@ describe('App — IPC rejection errors', () => {
     expect(await screen.findByText(/Error: Game not found/)).toBeInTheDocument();
   });
 
+  it('shows game-full status when joinGame rejects with "Game is full"', async () => {
+    const user = userEvent.setup();
+    mockMafia.joinGame.mockRejectedValue(new Error('Game is full'));
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Join Game' }));
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.type(screen.getByPlaceholderText('Enter game code'), 'abc123');
+    await user.click(document.querySelector('.btn-full'));
+    expect(await screen.findByText(/That game is full/)).toBeInTheDocument();
+  });
+
   it('shows error status when joinAsSpectator rejects', async () => {
     const user = userEvent.setup();
     mockMafia.joinAsSpectator.mockRejectedValue(new Error('Game is full'));

@@ -108,6 +108,7 @@
   "statusEnterCode": "Enter a game code",
   "statusGameClosed": "Game closed.",
   "statusLeftGame": "You left the game.",
+  "statusGameFull": "That game is full. Try a different code.",
   "statusNoGames": "No waiting games found.",
   "statusWaitingGames": "Waiting games: {{summary}}",
   "statusCodeCopied": "Game code copied.",
@@ -127,6 +128,7 @@
   "chatPlaceholder": "Say something\u2026",
   "chatSend": "Send",
   "chatEmpty": "No messages yet. Start the discussion!",
+  "chatDeadHint": "You have been eliminated and can no longer chat.",
 
   "actionMarkingReady": "Marking ready",
   "actionMarkingUnready": "Marking unready",

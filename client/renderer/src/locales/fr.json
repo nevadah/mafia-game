@@ -108,6 +108,7 @@
   "statusEnterCode": "Entrez un code de partie",
   "statusGameClosed": "Partie fermée.",
   "statusLeftGame": "Vous avez quitté la partie.",
+  "statusGameFull": "Cette partie est pleine. Essayez un autre code.",
   "statusNoGames": "Aucune partie en attente.",
   "statusWaitingGames": "Parties en attente : {{summary}}",
   "statusCodeCopied": "Code copié.",
@@ -127,6 +128,7 @@
   "chatPlaceholder": "Dites quelque chose\u2026",
   "chatSend": "Envoyer",
   "chatEmpty": "Pas encore de messages. Lancez la discussion\u00a0!",
+  "chatDeadHint": "Vous avez \u00e9t\u00e9 \u00e9limin\u00e9 et ne pouvez plus discuter.",
 
   "actionMarkingReady": "Marquer prêt",
   "actionMarkingUnready": "Marquer pas prêt",

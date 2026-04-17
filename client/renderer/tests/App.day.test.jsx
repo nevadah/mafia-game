@@ -408,7 +408,7 @@ describe('App — day phase chat panel', () => {
     expect(mockMafia.sendChat).toHaveBeenCalledWith('Quick message');
   });
 
-  it('does not show chat input for dead players', async () => {
+  it('does not show chat input for dead players and shows dead hint', async () => {
     const user = userEvent.setup();
     // Join as p4 (Dave) who is dead
     const state = makeDayState();
@@ -419,6 +419,13 @@ describe('App — day phase chat panel', () => {
     await user.type(screen.getByPlaceholderText('Enter game code'), 'game-1');
     await user.click(document.querySelector('.btn-full'));
     expect(screen.queryByPlaceholderText(/Say something/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/eliminated and can no longer chat/i)).toBeInTheDocument();
+  });
+
+  it('shows character counter on chat input', async () => {
+    const user = userEvent.setup();
+    await enterDayPhase(user, makeDayState());
+    expect(screen.getByText('0/200')).toBeInTheDocument();
   });
 
   it('updates chat panel when state_update arrives with new messages', async () => {
