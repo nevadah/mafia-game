@@ -17,6 +17,7 @@ const mockMafia = {
   onServerError: jest.fn(),
   onDeepLink: jest.fn(),
   onReconnecting: jest.fn(),
+  onGameClosed: jest.fn(),
   onDisconnected: jest.fn(),
   getStartupDeepLink: jest.fn().mockResolvedValue(null),
   createGame: jest.fn(),

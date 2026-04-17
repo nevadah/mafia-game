@@ -52,5 +52,7 @@ contextBridge.exposeInMainWorld('mafia', {
     ipcRenderer.on('mafia:disconnected', () => cb()),
   onNightActionSubmitted: (cb: (payload: { submittedCount: number; totalCount: number }) => void) =>
     ipcRenderer.on('mafia:night_action_submitted', (_e, p) => cb(p)),
+  onGameClosed: (cb: () => void) =>
+    ipcRenderer.on('mafia:game_closed', () => cb()),
   leaveSpectator: () => ipcRenderer.invoke('mafia:leave-spectator')
 });

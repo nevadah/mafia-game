@@ -317,6 +317,10 @@ export default function App() {
     window.mafia.onReconnecting(({ attempt, maxAttempts }) =>
       showStatus(t('statusReconnecting', { attempt, maxAttempts }), true)
     );
+    window.mafia.onGameClosed(() => {
+      resetGameUi();
+      showStatus(t('statusGameClosed'), true);
+    });
     window.mafia.onDisconnected(() => {
       resetGameUi();
       showStatus(t('statusDisconnected'), true);

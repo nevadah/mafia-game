@@ -1136,6 +1136,20 @@ describe('MafiaClient — night_action_submitted WebSocket event', () => {
   });
 });
 
+describe('MafiaClient — game_closed WebSocket event', () => {
+  it('emits game_closed and clears gameState', async () => {
+    const state = makeGameState();
+    const { client, ws } = await makeConnectedClient(state);
+    const events: undefined[] = [];
+    client.on('game_closed', (_p: undefined) => events.push(_p));
+
+    ws.receive({ type: 'game_closed', payload: {} });
+
+    expect(events).toHaveLength(1);
+    expect(client.gameState).toBeUndefined();
+  });
+});
+
 describe('MafiaClient — joinAsSpectator', () => {
   it('POST /games/:id/spectate and stores spectatorId as playerId', async () => {
     const state = makeGameState();
