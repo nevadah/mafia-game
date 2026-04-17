@@ -152,5 +152,7 @@
   "statusNoSpectateLink": "No hay enlace de espectador disponible.",
 
   "statusReconnecting": "Conexi\u00f3n perdida \u2014 reconectando (intento {{attempt}} de {{maxAttempts}})\u2026",
-  "statusDisconnected": "Conexi\u00f3n perdida. Volviendo al men\u00fa."
+  "statusDisconnected": "Conexi\u00f3n perdida. Volviendo al men\u00fa.",
+  "disconnectedBannerMessage": "Conexi\u00f3n perdida. Vuelve a conectarte o abandona la partida.",
+  "reconnectButton": "Reconectar"
 }

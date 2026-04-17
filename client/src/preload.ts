@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('mafia', {
   resolveNight: (force = false) => ipcRenderer.invoke('mafia:resolve-night', force),
   leaveGame: () => ipcRenderer.invoke('mafia:leave-game'),
   disconnect: () => ipcRenderer.invoke('mafia:disconnect'),
+  connect: () => ipcRenderer.invoke('mafia:connect'),
   onStateUpdate: (cb: (state: unknown) => void) =>
     ipcRenderer.on('mafia:state_update', (_e, s) => cb(s)),
   onPlayerJoined: (cb: (payload: unknown) => void) =>

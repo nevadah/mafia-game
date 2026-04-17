@@ -152,5 +152,7 @@
   "statusNoSpectateLink": "Aucun lien spectateur disponible.",
 
   "statusReconnecting": "Connexion perdue \u2014 reconnexion en cours (tentative {{attempt}} sur {{maxAttempts}})\u2026",
-  "statusDisconnected": "Connexion perdue. Retour au menu."
+  "statusDisconnected": "Connexion perdue. Retour au menu.",
+  "disconnectedBannerMessage": "Connexion perdue. Reconnectez-vous ou quittez la partie.",
+  "reconnectButton": "Reconnecter"
 }

@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './i18n';
 
-import AppHeader       from './components/AppHeader';
-import EntryScreen     from './components/EntryScreen';
-import ErrorBoundary   from './components/ErrorBoundary';
-import LobbyPhase      from './components/LobbyPhase';
-import DayPhase        from './components/DayPhase';
-import NightPhase      from './components/NightPhase';
-import GameOver        from './components/GameOver';
-import StatusBar       from './components/StatusBar';
+import AppHeader          from './components/AppHeader';
+import DisconnectedBanner from './components/DisconnectedBanner';
+import EntryScreen        from './components/EntryScreen';
+import ErrorBoundary      from './components/ErrorBoundary';
+import LobbyPhase         from './components/LobbyPhase';
+import DayPhase           from './components/DayPhase';
+import NightPhase         from './components/NightPhase';
+import GameOver           from './components/GameOver';
+import StatusBar          from './components/StatusBar';
 
 // ── Clipboard helpers ──────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export default function App() {
   const [currentPlayerId, setCurrentPlayerId] = useState(null);
   const [currentGameId, setCurrentGameId] = useState(null);
   const [isSpectator, setIsSpectator] = useState(false);
+  const [isDisconnected, setIsDisconnected] = useState(false);
   const [dismissedNightSummaryRound, setDismissedNightSummaryRound] = useState(null);
 
   const currentStateRef = useRef(currentState);
@@ -202,6 +204,7 @@ export default function App() {
     setCurrentPlayerId(null);
     setCurrentGameId(null);
     setIsSpectator(false);
+    setIsDisconnected(false);
     setDismissedNightSummaryRound(null);
     setStatus({ message: '', error: false });
   }
@@ -231,6 +234,16 @@ export default function App() {
       }
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
+  async function handleReconnect() {
+    setIsDisconnected(false);
+    try {
+      await window.mafia.connect();
+    } catch {
+      setIsDisconnected(true);
+      showStatus(t('statusDisconnected'), true);
     }
   }
 
@@ -337,8 +350,13 @@ export default function App() {
       showStatus(t('statusGameClosed'), true);
     });
     window.mafia.onDisconnected(() => {
-      resetGameUi();
-      showStatus(t('statusDisconnected'), true);
+      if (currentStateRef.current) {
+        setIsDisconnected(true);
+        showStatus(t('statusDisconnected'), true);
+      } else {
+        resetGameUi();
+        showStatus(t('statusDisconnected'), true);
+      }
     });
     function handleDeepLink(payload) {
       if (!payload) return;
@@ -386,6 +404,13 @@ export default function App() {
   return (
     <div className="app">
       <AppHeader theme={theme} onToggleTheme={toggleTheme} isSpectator={isSpectator} />
+
+      {isDisconnected && currentState && (
+        <DisconnectedBanner
+          onRetry={handleReconnect}
+          onLeave={() => { resetGameUi(); showStatus(t('statusLeftGame')); }}
+        />
+      )}
 
       {!currentState && (
         <EntryScreen

@@ -260,3 +260,7 @@ ipcMain.handle('mafia:disconnect', () => {
   client?.disconnect();
   client = null;
 });
+
+ipcMain.handle('mafia:connect', async () => {
+  if (client) await client.connect();
+});

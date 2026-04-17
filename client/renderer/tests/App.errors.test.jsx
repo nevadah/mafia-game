@@ -36,7 +36,8 @@ const mockMafia = {
   leaveGame: jest.fn(),
   leaveSpectator: jest.fn(),
   onNightActionSubmitted: jest.fn(),
-  disconnect: jest.fn()
+  disconnect: jest.fn(),
+  connect: jest.fn()
 };
 
 function makeLobbyState(overrides = {}) {
@@ -236,7 +237,7 @@ describe('App — WebSocket event errors', () => {
     expect(screen.queryByText('Lobby')).not.toBeInTheDocument();
   });
 
-  it('resets to entry screen when onDisconnected fires mid-game', async () => {
+  it('shows disconnected banner (not entry screen) when onDisconnected fires mid-game', async () => {
     const user = userEvent.setup();
     mockMafia.createGame.mockResolvedValue({
       playerId: 'p1',
@@ -247,16 +248,69 @@ describe('App — WebSocket event errors', () => {
     render(<App />);
     await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
     await user.click(screen.getByRole('button', { name: 'Create Game' }));
-
-    // Confirm we're in the lobby
     expect(await screen.findByText('Lobby')).toBeInTheDocument();
 
-    // Fire disconnect
     const cb = mockMafia.onDisconnected.mock.calls[0][0];
     act(() => cb());
 
-    // Entry screen should be visible again
+    // Banner appears; game phase still visible behind it
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    expect(screen.getByText('Lobby')).toBeInTheDocument();
+    // Entry screen is NOT shown
+    expect(screen.queryByRole('button', { name: 'Create Game' })).not.toBeInTheDocument();
+  });
+
+  it('returns to entry screen when Leave is clicked on the disconnected banner', async () => {
+    const user = userEvent.setup();
+    mockMafia.createGame.mockResolvedValue({
+      playerId: 'p1',
+      gameId: 'game-1',
+      state: makeLobbyState()
+    });
+
+    render(<App />);
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.click(screen.getByRole('button', { name: 'Create Game' }));
+    expect(await screen.findByText('Lobby')).toBeInTheDocument();
+
+    const cb = mockMafia.onDisconnected.mock.calls[0][0];
+    act(() => cb());
+
+    await user.click(screen.getByRole('button', { name: 'Leave Game' }));
+
     expect(screen.getByRole('button', { name: 'Create Game' })).toBeInTheDocument();
     expect(screen.queryByText('Lobby')).not.toBeInTheDocument();
+  });
+
+  it('calls connect() and hides banner when Reconnect is clicked', async () => {
+    const user = userEvent.setup();
+    mockMafia.createGame.mockResolvedValue({
+      playerId: 'p1',
+      gameId: 'game-1',
+      state: makeLobbyState()
+    });
+    mockMafia.connect.mockResolvedValue(undefined);
+
+    render(<App />);
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.click(screen.getByRole('button', { name: 'Create Game' }));
+    expect(await screen.findByText('Lobby')).toBeInTheDocument();
+
+    const cb = mockMafia.onDisconnected.mock.calls[0][0];
+    act(() => cb());
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reconnect' }));
+
+    expect(mockMafia.connect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+  });
+
+  it('resets to entry screen when onDisconnected fires with no active game', () => {
+    render(<App />);
+    const cb = mockMafia.onDisconnected.mock.calls[0][0];
+    act(() => cb());
+    // No game state — should go back to entry (same as before)
+    expect(screen.getByRole('button', { name: 'Create Game' })).toBeInTheDocument();
   });
 });

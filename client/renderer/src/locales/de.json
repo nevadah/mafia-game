@@ -152,5 +152,7 @@
   "statusNoSpectateLink": "Kein Zuschauerlink verfügbar.",
 
   "statusReconnecting": "Verbindung unterbrochen \u2014 Wiederverbindung (Versuch {{attempt}} von {{maxAttempts}})\u2026",
-  "statusDisconnected": "Verbindung verloren. Zur\u00fcck zum Men\u00fc."
+  "statusDisconnected": "Verbindung verloren. Zur\u00fcck zum Men\u00fc.",
+  "disconnectedBannerMessage": "Verbindung verloren. Erneut verbinden oder Spiel verlassen.",
+  "reconnectButton": "Erneut verbinden"
 }
