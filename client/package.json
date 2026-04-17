@@ -2,6 +2,7 @@
   "name": "mafia-client",
   "version": "1.0.0",
   "description": "Mafia game Electron client",
+  "license": "Apache-2.0",
   "main": "dist/main.js",
   "scripts": {
     "build:main": "tsc",

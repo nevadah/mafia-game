@@ -2,6 +2,7 @@
   "name": "mafia-game",
   "version": "1.0.0",
   "description": "Multiplayer Mafia game — monorepo root",
+  "license": "Apache-2.0",
   "private": true,
   "workspaces": [
     "shared",
