@@ -152,5 +152,7 @@
   "statusNoSpectateLink": "No spectate link available.",
 
   "statusReconnecting": "Connection lost \u2014 reconnecting (attempt {{attempt}} of {{maxAttempts}})\u2026",
-  "statusDisconnected": "Connection lost. Returning to menu."
+  "statusDisconnected": "Connection lost. Returning to menu.",
+  "disconnectedBannerMessage": "Connection lost. Reconnect or leave the game.",
+  "reconnectButton": "Reconnect"
 }
