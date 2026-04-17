@@ -55,7 +55,7 @@ export const VoteSchema = z.object({
 });
 
 export const ChatSchema = z.object({
-  text:     z.string().min(1, 'text cannot be empty').max(500, 'message must be 500 characters or fewer'),
+  text:     z.string().min(1, 'text cannot be empty').max(200, 'message must be 200 characters or fewer'),
   playerId: optionalPlayerId,
 });
 

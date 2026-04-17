@@ -423,6 +423,7 @@ export class MafiaClient extends EventEmitter {
       const onConnectedOnce = (msg: ServerMessage) => {
         if (!resolved && msg.type === 'connected') {
           resolved = true;
+          this._reconnectAttempts = 0;
           resolve();
         }
       };
