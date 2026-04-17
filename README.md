@@ -1,5 +1,7 @@
 # mafia-game
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 mafia-game is a TypeScript monorepo for a multiplayer implementation of the social deduction game Mafia.
 
 Mafia is a social deduction game where players are secretly assigned roles — villagers and mafia members. Mafia members know each other's identities, but villagers do not. Players alternate between a day phase (open discussion and voting to eliminate a suspected mafia member) and a night phase (mafia secretly eliminates a villager). The village wins by eliminating all mafia; the mafia wins by reaching parity with the villagers.
@@ -14,6 +16,12 @@ It contains:
 This project was inspired by [Turing Games](https://www.youtube.com/@turing_games), a YouTube channel that pits AI models (Claude, ChatGPT, Gemini, Grok, and others) against each other in games of Mafia.
 
 It serves two purposes: building a functional multiplayer implementation of Mafia, and serving as a hands-on exercise in AI-assisted development using tools including Claude Code and ChatGPT. It is part of the public portfolio of [Nevada Hamaker](https://github.com/nevadah), a senior software engineer.
+
+## AI Assistance Disclosure
+
+This project was developed with substantial assistance from AI coding tools, primarily [Claude Code](https://claude.ai/claude-code) (Anthropic). The AI assisted with code generation, test writing, refactoring, and documentation across most of the codebase. All architectural decisions, feature direction, code review, and acceptance of changes were made by the human author.
+
+The `Co-Authored-By: Claude Sonnet 4.6` lines in commit messages reflect this contribution transparently. Anthropic's Terms of Service assign ownership of AI-generated outputs to the user; the AI holds no copyright interest in this work.
 
 ## Current Status
 
