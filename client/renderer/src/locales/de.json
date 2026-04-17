@@ -65,6 +65,7 @@
   "selectProtect": "Spieler zum Schützen wählen",
   "selectInvestigate": "Spieler zum Untersuchen wählen",
   "actionSubmitted": "Aktion übermittelt. Warte auf Nachtauflösung\u2026",
+  "nightActionsLabel": "Nachtaktionen",
   "nightActionsProgress": "{{submitted}} von {{total}} Nachtaktionen eingereicht.",
   "eliminateAction": "Eliminieren",
   "protectAction": "Schützen",

@@ -65,6 +65,8 @@ function makeNightState({ myRole = 'mafia', investigatedThisRound = null, overri
     })),
     votes: {},
     nightActions: {},
+    nightActorCount: 3,
+    nightSubmittedCount: 3,
     investigatedThisRound,
     eliminatedThisRound: undefined,
     settings: BASE_SETTINGS,

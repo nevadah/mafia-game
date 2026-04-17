@@ -34,7 +34,7 @@ export default function NightPhase({
 
   const nightActorCount = currentState.nightActorCount ?? 0;
   const nightSubmittedCount = currentState.nightSubmittedCount ?? 0;
-  const allActionsIn = nightActorCount > 0 && nightSubmittedCount >= nightActorCount;
+  const allActionsIn = nightActorCount === 0 || nightSubmittedCount >= nightActorCount;
 
   return (
     <>
@@ -146,7 +146,7 @@ export default function NightPhase({
 
       {(isHost || isSpectator) && nightActorCount > 0 && (
         <div className="card stack">
-          <div className="section-heading">{t('playersLabel')}</div>
+          <div className="section-heading">{t('nightActionsLabel')}</div>
           <p className="meta">
             {t('nightActionsProgress', { submitted: nightSubmittedCount, total: nightActorCount })}
           </p>
