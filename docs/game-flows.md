@@ -38,7 +38,7 @@
 3. If `force=false`, server requires all eligible alive night actors to submit actions.
 4. Mafia kill rule:
 - mafia consensus target (single top mafia vote) required
-- tied mafia targets -> no kill
+- tied mafia targets → no kill (per the original Davidoff rules, which require unanimous agreement among mafia; if they cannot agree, no one dies that night)
 - doctor save on mafia target prevents elimination
 5. Sheriff investigation result is recorded in round metadata.
 6. Server checks win condition:

@@ -120,7 +120,7 @@ Before starting a new branch:
 - Do not duplicate game rule enforcement on the client.
 - Role visibility rules: roles are secret during an active game; all roles are revealed at game end.
 - Resolve gating: `/resolve-votes` and `/resolve-night` block unless all required actions are submitted, unless `force: true` is passed.
-- Tie behavior: day vote tie → no elimination; night mafia vote tie → no kill.
+- Tie behavior: day vote tie → no elimination; night mafia vote tie → no kill. Both rules follow the original Davidoff rules for Mafia, which require unanimous mafia agreement to kill. Do not change these rules without explicit instruction.
 - WebSocket disconnect starts a 30-second grace timer before removing the player. If the client reconnects with the same token within that window, the timer is cancelled. An explicit leave (`POST /leave`) is immediate. Closing the Electron window mid-game removes the player after the grace period.
 - Host leaving or disconnecting deletes the game.
 - Spectators join via `POST /games/:gameId/spectate` and leave via `POST /games/:gameId/spectate-leave`. Spectator tokens are rejected with `403` by all player-action endpoints. Spectators are not counted in `getPlayerCount()` and do not affect game mechanics.
