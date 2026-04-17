@@ -36,7 +36,7 @@ class HttpError extends Error {
   }
 }
 
-// ── Per-player chat rate limiter (sliding window) ─────────────────────────────
+// ── Per-player sliding-window rate limiters ────────────────────────────────────
 
 const CHAT_RATE_LIMIT = 10;          // max messages
 const CHAT_RATE_WINDOW_MS = 10_000;  // per 10 seconds
@@ -48,6 +48,21 @@ function checkChatRateLimit(token: string): boolean {
   if (recent.length >= CHAT_RATE_LIMIT) return false;
   recent.push(now);
   _chatTimestamps.set(token, recent);
+  return true;
+}
+
+// Vote and night-action: at most 5 submissions per 30 seconds per player.
+// A player legitimately submits once per phase, so this only blocks hammering.
+const ACTION_RATE_LIMIT = 5;
+const ACTION_RATE_WINDOW_MS = 30_000;
+const _actionTimestamps = new Map<string, number[]>();
+
+function checkActionRateLimit(token: string): boolean {
+  const now = Date.now();
+  const recent = (_actionTimestamps.get(token) ?? []).filter(t => now - t < ACTION_RATE_WINDOW_MS);
+  if (recent.length >= ACTION_RATE_LIMIT) return false;
+  recent.push(now);
+  _actionTimestamps.set(token, recent);
   return true;
 }
 
@@ -361,6 +376,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     try {
       const body = parseBody(VoteSchema, req.body, res);
       if (!body) return;
+      const token = authTokenFromRequest(req);
+      if (token && !checkActionRateLimit(token)) {
+        return res.status(429).json({ error: 'Too many requests. Slow down.' });
+      }
       const actorId = resolveActorPlayerId(req, gameManager, game.id, body.voterId);
       const { targetId } = body;
       game.castVote(actorId, targetId);
@@ -469,6 +488,10 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
     try {
       const body = parseBody(NightActionSchema, req.body, res);
       if (!body) return;
+      const token = authTokenFromRequest(req);
+      if (token && !checkActionRateLimit(token)) {
+        return res.status(429).json({ error: 'Too many requests. Slow down.' });
+      }
       const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       game.submitNightAction(actorId, body.targetId);
       const totalCount = game.getNightActionActorIds().length;

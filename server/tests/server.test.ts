@@ -306,6 +306,33 @@ describe('REST API', () => {
         .send({ voterId: playerIds[0], targetId: playerIds[0] });
       expect(res.status).toBe(400);
     });
+
+    it('returns 429 when a player submits too many votes in the rate window', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'RateHost' });
+      const { gameId, playerId: hostId } = createRes.body;
+      const hostToken = createRes.body.token as string;
+      for (const name of ['P2', 'P3', 'P4']) {
+        await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
+      }
+      await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      await request(app).post(`/games/${gameId}/resolve-night`).send({ playerId: hostId, force: true });
+      const game = gameManager.getGame(gameId)!;
+      const target = game.getAlivePlayers().find(p => p.id !== hostId)!;
+      // Send 5 votes (the limit) — game rejects duplicates after first but rate limiter counts them
+      for (let i = 0; i < 5; i++) {
+        await request(app)
+          .post(`/games/${gameId}/vote`)
+          .set('x-player-token', hostToken)
+          .send({ voterId: hostId, targetId: target.id });
+      }
+      // 6th should be rate-limited
+      const limited = await request(app)
+        .post(`/games/${gameId}/vote`)
+        .set('x-player-token', hostToken)
+        .send({ voterId: hostId, targetId: target.id });
+      expect(limited.status).toBe(429);
+      expect(limited.body.error).toMatch(/too many requests/i);
+    });
   });
 
   describe('POST /games/:gameId/resolve-votes', () => {
@@ -404,6 +431,35 @@ describe('REST API', () => {
     it('returns 404 for unknown game', async () => {
       const res = await request(app).post('/games/unknown/night-action').send({ playerId: 'a', targetId: 'b' });
       expect(res.status).toBe(404);
+    });
+
+    it('returns 429 when a player submits too many night actions in the rate window', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'RateHost' });
+      const { gameId, playerId: hostId } = createRes.body;
+      const hostToken = createRes.body.token as string;
+      for (const name of ['Bob', 'Carol', 'Dave', 'Eve']) {
+        await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
+      }
+      await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      const game = gameManager.getGame(gameId)!;
+      const actor = game.getNightActionActorIds().includes(hostId)
+        ? game.getPlayers().find(p => p.id === hostId)!
+        : game.getPlayers().find(p => game.getNightActionActorIds().includes(p.id))!;
+      const target = game.getAlivePlayers().find(p => p.id !== actor.id)!;
+      // Send 5 night actions (the limit)
+      for (let i = 0; i < 5; i++) {
+        await request(app)
+          .post(`/games/${gameId}/night-action`)
+          .set('x-player-token', hostToken)
+          .send({ playerId: actor.id, targetId: target.id });
+      }
+      // 6th should be rate-limited
+      const limited = await request(app)
+        .post(`/games/${gameId}/night-action`)
+        .set('x-player-token', hostToken)
+        .send({ playerId: actor.id, targetId: target.id });
+      expect(limited.status).toBe(429);
+      expect(limited.body.error).toMatch(/too many requests/i);
     });
   });
 
