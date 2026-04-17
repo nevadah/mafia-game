@@ -223,8 +223,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .badge.you       { border-color: #e94560; color: #e94560; }
 .badge.host      { border-color: #f39c12; color: #f39c12; }
 .badge.ready     { border-color: #27ae60; color: #27ae60; }
-.badge.not-ready { border-color: var(--color-text-muted); color: var(--color-text-muted); }
-.badge.dead      { border-color: var(--color-text-muted); color: var(--color-text-muted); }
+.badge.not-ready     { border-color: var(--color-text-muted); color: var(--color-text-muted); }
+.badge.disconnected  { border-color: #e67e22; color: #e67e22; }
+.badge.dead          { border-color: var(--color-text-muted); color: var(--color-text-muted); }
 
 /* ── Game code box ───────────────────────────────────────────────────────── */
 

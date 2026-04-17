@@ -44,6 +44,7 @@ export default function LobbyPhase({
               <div className="badges">
                 {player.id === currentPlayerId && <span className="badge you">{t('youBadge')}</span>}
                 {player.id === currentState.hostId && <span className="badge host">{t('hostBadge')}</span>}
+                {!player.isConnected && <span className="badge disconnected">{t('disconnectedBadge')}</span>}
                 <span className={`badge ${player.isReady ? 'ready' : 'not-ready'}`}>
                   {player.isReady ? t('readyBadge') : t('notReadyBadge')}
                 </span>

@@ -5,7 +5,7 @@ import NightSummaryModal from './NightSummaryModal';
 export default function DayPhase({
   currentState, currentPlayerId, me, isHost, isSpectator,
   dismissedNightSummaryRound, onDismissNightSummary,
-  runAction, onLeave
+  runAction, onResolveDay, onLeave
 }) {
   const { t } = useTranslation();
   const [forceResolve, setForceResolve] = useState(false);
@@ -101,7 +101,7 @@ export default function DayPhase({
               />
               {t('forceResolve')}
             </label>
-            <button onClick={() => runAction(t('actionResolvingDay'), () => window.mafia.resolveVotes(forceResolve))}>
+            <button onClick={() => onResolveDay(forceResolve)}>
               {t('resolveDay')}
             </button>
           </div>
