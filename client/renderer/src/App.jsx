@@ -231,9 +231,15 @@ export default function App() {
 
   async function handleLeave() {
     try {
-      const result = await window.mafia.leaveGame();
-      resetGameUi();
-      showStatus(result.deletedGame ? t('statusGameClosed') : t('statusLeftGame'));
+      if (isSpectator) {
+        await window.mafia.leaveSpectator();
+        resetGameUi();
+        showStatus(t('statusLeftGame'));
+      } else {
+        const result = await window.mafia.leaveGame();
+        resetGameUi();
+        showStatus(result.deletedGame ? t('statusGameClosed') : t('statusLeftGame'));
+      }
     } catch (err) {
       showStatus(`Error: ${err.message}`, true);
     }

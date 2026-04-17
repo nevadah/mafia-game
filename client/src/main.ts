@@ -248,6 +248,12 @@ ipcMain.handle('mafia:leave-game', async () => {
   return result;
 });
 
+ipcMain.handle('mafia:leave-spectator', async () => {
+  if (!client) throw new Error('Not connected to a game');
+  await client.leaveAsSpectator();
+  client = null;
+});
+
 ipcMain.handle('mafia:disconnect', () => {
   client?.disconnect();
   client = null;

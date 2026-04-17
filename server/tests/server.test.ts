@@ -466,6 +466,68 @@ describe('REST API', () => {
     });
   });
 
+  describe('POST /games/:gameId/leave', () => {
+    async function setupActiveGame() {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId: hostId, token: hostToken } = createRes.body;
+      const joinedIds: { playerId: string; token: string }[] = [];
+      for (const name of ['Bob', 'Carol', 'Dave']) {
+        const r = await request(app).post(`/games/${gameId}/join`).send({ playerName: name });
+        joinedIds.push({ playerId: r.body.playerId, token: r.body.token });
+      }
+      await request(app).post(`/games/${gameId}/start`).send({ playerId: hostId });
+      return { gameId, hostId, hostToken, others: joinedIds };
+    }
+
+    it('host leaving during active game deletes the game', async () => {
+      const { gameId, hostToken } = await setupActiveGame();
+
+      const res = await request(app)
+        .post(`/games/${gameId}/leave`)
+        .set('x-player-token', hostToken)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.deletedGame).toBe(true);
+
+      const stateRes = await request(app).get(`/games/${gameId}`);
+      expect(stateRes.status).toBe(404);
+    });
+
+    it('non-host player leaving active game does not delete the game', async () => {
+      const { gameId, others } = await setupActiveGame();
+      const { token: bobToken } = others[0];
+
+      const res = await request(app)
+        .post(`/games/${gameId}/leave`)
+        .set('x-player-token', bobToken)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.deletedGame).toBe(false);
+
+      const stateRes = await request(app).get(`/games/${gameId}`);
+      expect(stateRes.status).toBe(200);
+    });
+
+    it('last player leaving deletes the game', async () => {
+      const createRes = await request(app).post('/games').send({ hostName: 'Alice' });
+      const { gameId, playerId: hostId } = createRes.body;
+
+      const res = await request(app)
+        .post(`/games/${gameId}/leave`)
+        .send({ playerId: hostId });
+
+      expect(res.status).toBe(200);
+      expect(res.body.deletedGame).toBe(true);
+    });
+
+    it('returns 404 for unknown game', async () => {
+      const res = await request(app).post('/games/nonexistent/leave').send({ playerId: 'p1' });
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('POST /games/:gameId/chat', () => {
     async function setupDayGame() {
       const createRes = await request(app).post('/games').send({ hostName: 'Alice' });

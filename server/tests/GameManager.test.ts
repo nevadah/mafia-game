@@ -139,4 +139,54 @@ describe('GameManager', () => {
       expect(manager.getGameCount()).toBe(2);
     });
   });
+
+  describe('leaveGame — host departure closes the game', () => {
+    it('deletes the game when the host leaves', () => {
+      const { game, hostPlayer } = manager.createGame('Alice');
+      manager.joinGame(game.id, 'Bob');
+
+      const { deletedGame } = manager.leaveGame(game.id, hostPlayer.id);
+
+      expect(deletedGame).toBe(true);
+      expect(manager.getGame(game.id)).toBeUndefined();
+    });
+
+    it('revokes all sessions when host leaves and game is deleted', () => {
+      const { game, hostPlayer, token: hostToken } = manager.createGame('Alice');
+      const { token: bobToken } = manager.joinGame(game.id, 'Bob');
+
+      manager.leaveGame(game.id, hostPlayer.id);
+
+      expect(manager.getSession(hostToken)).toBeUndefined();
+      expect(manager.getSession(bobToken)).toBeUndefined();
+    });
+
+    it('deletes the game when the last player leaves', () => {
+      const { game, hostPlayer } = manager.createGame('Alice');
+
+      const { deletedGame } = manager.leaveGame(game.id, hostPlayer.id);
+
+      expect(deletedGame).toBe(true);
+      expect(manager.getGame(game.id)).toBeUndefined();
+    });
+
+    it('does not delete the game when a non-host player leaves', () => {
+      const { game } = manager.createGame('Alice');
+      const { player: bob } = manager.joinGame(game.id, 'Bob');
+
+      const { deletedGame } = manager.leaveGame(game.id, bob.id);
+
+      expect(deletedGame).toBe(false);
+      expect(manager.getGame(game.id)).toBeDefined();
+    });
+
+    it('throws for unknown game', () => {
+      expect(() => manager.leaveGame('bad-id', 'p1')).toThrow('Game not found');
+    });
+
+    it('throws for unknown player', () => {
+      const { game } = manager.createGame('Alice');
+      expect(() => manager.leaveGame(game.id, 'nobody')).toThrow('Player not found');
+    });
+  });
 });
