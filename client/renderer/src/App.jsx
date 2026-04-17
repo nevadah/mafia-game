@@ -219,6 +219,21 @@ export default function App() {
     }
   }
 
+  async function handleResolveDayClick(force) {
+    try {
+      showStatus(`${t('actionResolvingDay')}...`);
+      const result = await window.mafia.resolveVotes(force);
+      if (result && result.state) applyState(result.state);
+      if (result.eliminated === null && result.winner === null) {
+        showStatus(t('statusVoteTied'));
+      } else {
+        showStatus('');
+      }
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, true);
+    }
+  }
+
   function buildJoinDeepLink() {
     const gameId = currentGameId || (currentState && currentState.id);
     if (!gameId) return null;
@@ -410,6 +425,7 @@ export default function App() {
             dismissedNightSummaryRound={dismissedNightSummaryRound}
             onDismissNightSummary={setDismissedNightSummaryRound}
             runAction={runAction}
+            onResolveDay={handleResolveDayClick}
             onLeave={handleLeave}
           />
         )}

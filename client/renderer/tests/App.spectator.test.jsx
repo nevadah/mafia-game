@@ -266,6 +266,18 @@ describe('App — lobby phase as spectator', () => {
     // One is in the header, one is the badge on the spectator in the list
     expect(spectatorItems.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('shows Disconnected badge for players with isConnected: false', async () => {
+    const user = userEvent.setup();
+    const state = makeLobbyState({
+      players: [
+        { id: 'p1', name: 'Alice', isAlive: true, isReady: false, isConnected: true },
+        { id: 'p2', name: 'Bob',   isAlive: true, isReady: false, isConnected: false }
+      ]
+    });
+    await enterSpectatorLobby(user, state);
+    expect(screen.getByText('Disconnected')).toBeInTheDocument();
+  });
 });
 
 // ── Day phase — spectator view ────────────────────────────────────────────────

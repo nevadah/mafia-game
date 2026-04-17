@@ -249,6 +249,22 @@ describe('App — day phase host controls', () => {
     await user.click(screen.getByRole('button', { name: 'Resolve Day' }));
     expect(mockMafia.resolveVotes).toHaveBeenCalledWith(true);
   });
+
+  it('shows tie status when resolveVotes returns eliminated=null and winner=null', async () => {
+    const user = userEvent.setup();
+    mockMafia.resolveVotes.mockResolvedValue({ eliminated: null, winner: null, state: makeDayState() });
+    await enterDayPhase(user, makeDayState());
+    await user.click(screen.getByRole('button', { name: 'Resolve Day' }));
+    expect(await screen.findByText(/Vote tied/i)).toBeInTheDocument();
+  });
+
+  it('does not show tie status when a player is eliminated', async () => {
+    const user = userEvent.setup();
+    mockMafia.resolveVotes.mockResolvedValue({ eliminated: 'p2', winner: null, state: makeDayState() });
+    await enterDayPhase(user, makeDayState());
+    await user.click(screen.getByRole('button', { name: 'Resolve Day' }));
+    expect(screen.queryByText(/Vote tied/i)).not.toBeInTheDocument();
+  });
 });
 
 // ── Eliminated players ────────────────────────────────────────────────────────
