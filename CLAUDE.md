@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides Claude Code with context about this repository.
+This file provides Claude Code with project-specific context. Cross-project working preferences (branch hygiene, quality gates, issue tracking, session protocol, code and response style) are in `WORKING_STYLE.md`.
 
 ## Project Overview
 
@@ -92,7 +92,6 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 - Jest + ts-jest in both workspaces.
 - Coverage thresholds: 80% line/function/statement for both workspaces; branch coverage is 70% for `server/` and 80% for `client/`.
 - Client integration tests spin up a live server (global setup/teardown).
-- **CI fails on any warnings, deprecations, or ESLint errors.** Keep test and lint output clean. Run `npm run lint` before pushing.
 
 ## Typical Change Workflow
 
@@ -103,16 +102,8 @@ Win conditions: town wins when no mafia remain; mafia wins when mafia count ≥ 
 5. UI → edit or add a component in `client/renderer/src/components/`; wire it into `client/renderer/src/App.jsx` if it's a new phase-level component
 6. New UI strings → add key + English value to `client/renderer/src/locales/en.json`, then `de.json`, `es.json`, `fr.json`; use `t('key')` in the component.
 7. Add/update tests in the corresponding workspace `tests/` folder.
-8. **Before opening a PR**: audit `CLAUDE.md` and `docs/` for anything the branch has made stale or left undocumented — new endpoints, changed constraints, new IPC methods, updated workflows, etc. Update inline rather than deferring to a follow-up PR.
 
 Keep contracts synchronized across server route payloads, `MafiaClient`, the IPC bridge, and renderer call sites.
-
-## Branch Hygiene
-
-Before starting a new branch:
-
-1. **Verify the previous PR is merged** — check with `gh pr list` or `git log origin/main`. Do not assume a PR merged because it was opened; confirm it.
-2. **Pull from main** — always branch from an up-to-date main. A stale branch divergence can cause bug fixes from a recently merged PR to be absent, requiring manual re-application of changes.
 
 ## Important Constraints
 
