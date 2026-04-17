@@ -79,6 +79,24 @@ function resolveActorPlayerId(
   return fallbackPlayerId;
 }
 
+function resolveSpectatorId(req: Request, gameManager: GameManager, gameId: string): string {
+  const token = authTokenFromRequest(req);
+  if (!token) {
+    throw new HttpError(401, 'Authentication required');
+  }
+  const session = gameManager.getSession(token);
+  if (!session) {
+    throw new HttpError(401, 'Invalid player token');
+  }
+  if (session.gameId !== gameId) {
+    throw new HttpError(403, 'Token does not match this game');
+  }
+  if (!session.isSpectator) {
+    throw new HttpError(403, 'Token belongs to a player, not a spectator');
+  }
+  return session.playerId;
+}
+
 /**
  * Parse and validate a request body against a Zod schema.
  * Returns the typed data on success, or responds with 400 and returns null.
@@ -208,6 +226,31 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
         return res.status(404).json({ error: message });
       }
       return res.status(400).json({ error: message });
+    }
+  });
+
+  // ── POST /games/:gameId/spectate-leave ────────────────────────────────────
+  app.post('/games/:gameId/spectate-leave', (req: Request, res: Response) => {
+    const game = gameManager.getGame(req.params.gameId);
+    if (!game) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    try {
+      const spectatorId = resolveSpectatorId(req, gameManager, game.id);
+      gameManager.leaveSpectator(game.id, spectatorId);
+      broadcast(game.id, {
+        type: 'spectator_left',
+        payload: { spectatorId, state: game.toState() }
+      });
+      return res.json({ ok: true });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === 'Game not found') {
+        return res.status(404).json({ error: message });
+      }
+      const status = err instanceof HttpError ? err.status : 400;
+      return res.status(status).json({ error: message });
     }
   });
 

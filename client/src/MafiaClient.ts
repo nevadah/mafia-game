@@ -364,6 +364,30 @@ export class MafiaClient extends EventEmitter {
   }
 
   /**
+   * Leave the current game as a spectator.
+   */
+  async leaveAsSpectator(): Promise<void> {
+    if (!this._gameId || !this._playerId) throw new Error('Not in a game');
+    const res = await this.fetchImpl(`${this.baseUrl}/games/${this._gameId}/spectate-leave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
+      body: JSON.stringify({})
+    });
+
+    if (!res.ok) {
+      const err = await res.json() as { error?: string };
+      throw new Error(err.error ?? `Server error ${res.status}`);
+    }
+
+    this.disconnect();
+    this._gameId = undefined;
+    this._playerId = undefined;
+    this._token = undefined;
+    this._gameState = undefined;
+    this._isSpectator = false;
+  }
+
+  /**
    * Poll the server for the current game state.
    */
   async fetchGameState(): Promise<GameState> {
@@ -423,6 +447,7 @@ export class MafiaClient extends EventEmitter {
       const onConnectedOnce = (msg: ServerMessage) => {
         if (!resolved && msg.type === 'connected') {
           resolved = true;
+          this._reconnectAttempts = 0;
           resolve();
         }
       };

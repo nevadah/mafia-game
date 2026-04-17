@@ -266,4 +266,72 @@ describe('Spectator feature', () => {
       expect(gameManager.getSession(token)).toBeUndefined();
     });
   });
+
+  // ── POST /games/:gameId/spectate-leave ────────────────────────────────────────
+
+  describe('POST /games/:gameId/spectate-leave', () => {
+    it('removes the spectator and returns ok', async () => {
+      const { gameId } = await createGame();
+      const specRes = await spectate(gameId, 'Watcher');
+      const { token } = specRes.body;
+
+      const leaveRes = await request(app)
+        .post(`/games/${gameId}/spectate-leave`)
+        .set('x-player-token', token)
+        .send({});
+
+      expect(leaveRes.status).toBe(200);
+      expect(leaveRes.body.ok).toBe(true);
+    });
+
+    it('spectator no longer appears in game state after leaving', async () => {
+      const { gameId } = await createGame();
+      const specRes = await spectate(gameId, 'Watcher');
+      const { token } = specRes.body;
+
+      await request(app)
+        .post(`/games/${gameId}/spectate-leave`)
+        .set('x-player-token', token)
+        .send({});
+
+      const stateRes = await request(app).get(`/games/${gameId}`);
+      expect(stateRes.body.state.spectators).toHaveLength(0);
+    });
+
+    it('returns 401 when no token is provided', async () => {
+      const { gameId } = await createGame();
+      await spectate(gameId, 'Watcher');
+
+      const res = await request(app)
+        .post(`/games/${gameId}/spectate-leave`)
+        .send({});
+
+      expect(res.status).toBe(401);
+    });
+
+    it('returns 403 when a player token is used', async () => {
+      const { gameId, token: hostToken } = await createGame();
+
+      const res = await request(app)
+        .post(`/games/${gameId}/spectate-leave`)
+        .set('x-player-token', hostToken)
+        .send({});
+
+      expect(res.status).toBe(403);
+      expect(res.body.error).toMatch(/player, not a spectator/i);
+    });
+
+    it('returns 404 for unknown game', async () => {
+      const { gameId } = await createGame();
+      const specRes = await spectate(gameId, 'Watcher');
+      const { token } = specRes.body;
+
+      const res = await request(app)
+        .post('/games/nonexistent/spectate-leave')
+        .set('x-player-token', token)
+        .send({});
+
+      expect(res.status).toBe(404);
+    });
+  });
 });

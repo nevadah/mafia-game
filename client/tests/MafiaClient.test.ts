@@ -1013,3 +1013,258 @@ describe('MafiaClient — URL normalisation', () => {
     expect(fetch.mock.calls[0][0]).toBe('http://localhost:3000/games');
   });
 });
+
+describe('MafiaClient — token and isSpectator accessors', () => {
+  it('token returns undefined before joining', () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    expect(client.token).toBeUndefined();
+  });
+
+  it('token returns value after createGame', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', token: 'tok-abc', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    expect(client.token).toBe('tok-abc');
+  });
+
+  it('isSpectator returns false by default', () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    expect(client.isSpectator).toBe(false);
+  });
+});
+
+describe('MafiaClient — joinAsSpectator', () => {
+  it('POSTs to /spectate and stores spectatorId, token, isSpectator=true', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([{ ok: true, body: { spectatorId: 's1', token: 'spec-tok', state } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+
+    const result = await client.joinAsSpectator('g1', 'Watcher');
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/games/g1/spectate',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(result).toEqual(state);
+    expect(client.gameId).toBe('g1');
+    expect(client.playerId).toBe('s1');
+    expect(client.token).toBe('spec-tok');
+    expect(client.isSpectator).toBe(true);
+  });
+
+  it('throws on non-OK response with error field', async () => {
+    const fetch = makeFetch([{ ok: false, body: { error: 'Game not found' } }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await expect(client.joinAsSpectator('bad-id', 'Watcher')).rejects.toThrow('Game not found');
+  });
+
+  it('throws generic error when no error field', async () => {
+    const fetch = makeFetch([{ ok: false, body: {} }]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await expect(client.joinAsSpectator('g1', 'Watcher')).rejects.toThrow('Server error 400');
+  });
+});
+
+describe('MafiaClient — sendChat', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.sendChat('hello')).rejects.toThrow('Not in a game');
+  });
+
+  it('POSTs to /chat and returns message', async () => {
+    const state = makeGameState();
+    const chatMessage = { id: 'msg-1', playerId: 'p1', playerName: 'Alice', text: 'hello', timestamp: 0 };
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', token: 'tok', state } },
+      { ok: true, body: { message: chatMessage, state } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+
+    const result = await client.sendChat('hello');
+
+    expect(result).toEqual(chatMessage);
+    expect(fetch.mock.calls[1][0]).toBe('http://localhost:3000/games/g1/chat');
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Too long' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.sendChat('x'.repeat(300))).rejects.toThrow('Too long');
+  });
+});
+
+describe('MafiaClient — leaveGame', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.leaveGame()).rejects.toThrow('Not in a game');
+  });
+
+  it('POSTs to /leave and clears state', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', token: 'tok', state } },
+      { ok: true, body: { deletedGame: false } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+
+    const result = await client.leaveGame();
+
+    expect(result).toEqual({ deletedGame: false });
+    expect(client.gameId).toBeUndefined();
+    expect(client.playerId).toBeUndefined();
+    expect(client.token).toBeUndefined();
+    expect(client.gameState).toBeUndefined();
+    expect(client.isSpectator).toBe(false);
+  });
+
+  it('returns deletedGame=true when host leaves', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: true, body: { deletedGame: true } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+
+    const result = await client.leaveGame();
+    expect(result.deletedGame).toBe(true);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { gameId: 'g1', playerId: 'p1', state } },
+      { ok: false, body: { error: 'Player not found' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.createGame('Alice');
+    await expect(client.leaveGame()).rejects.toThrow('Player not found');
+  });
+});
+
+describe('MafiaClient — leaveAsSpectator', () => {
+  it('throws when not in a game', async () => {
+    const client = new MafiaClient('http://localhost:3000', { fetch: makeFetch([]) });
+    await expect(client.leaveAsSpectator()).rejects.toThrow('Not in a game');
+  });
+
+  it('POSTs to /spectate-leave and clears state', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { spectatorId: 's1', token: 'spec-tok', state } },
+      { ok: true, body: { ok: true } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.joinAsSpectator('g1', 'Watcher');
+
+    await client.leaveAsSpectator();
+
+    expect(fetch.mock.calls[1][0]).toBe('http://localhost:3000/games/g1/spectate-leave');
+    expect(client.gameId).toBeUndefined();
+    expect(client.playerId).toBeUndefined();
+    expect(client.token).toBeUndefined();
+    expect(client.isSpectator).toBe(false);
+  });
+
+  it('throws on error response', async () => {
+    const state = makeGameState();
+    const fetch = makeFetch([
+      { ok: true, body: { spectatorId: 's1', token: 'spec-tok', state } },
+      { ok: false, body: { error: 'Spectator not found' } }
+    ]);
+    const client = new MafiaClient('http://localhost:3000', { fetch });
+    await client.joinAsSpectator('g1', 'Watcher');
+    await expect(client.leaveAsSpectator()).rejects.toThrow('Spectator not found');
+  });
+});
+
+describe('MafiaClient — chat_message WebSocket event', () => {
+  it('emits chat_message event', async () => {
+    const { client, ws } = await makeConnectedClient();
+    const msgs: unknown[] = [];
+    client.on('chat_message', (p) => msgs.push(p));
+
+    const chatMsg = { id: 'm1', playerId: 'p1', playerName: 'Alice', text: 'hi', timestamp: 1 };
+    ws.receive({ type: 'chat_message', payload: chatMsg });
+
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]).toEqual(chatMsg);
+  });
+
+  it('appends chat message to gameState.messages and emits state_update', async () => {
+    const { client, ws, state } = await makeConnectedClient();
+    const updates: unknown[] = [];
+    client.on('state_update', (s) => updates.push(s));
+
+    const chatMsg = { id: 'm1', playerId: 'p1', playerName: 'Alice', text: 'hi', timestamp: 1 };
+    ws.receive({ type: 'chat_message', payload: chatMsg });
+
+    expect(updates).toHaveLength(1);
+    const updatedState = updates[0] as typeof state;
+    expect(updatedState.messages).toHaveLength(1);
+    expect(updatedState.messages![0]).toEqual(chatMsg);
+  });
+
+  it('does not emit state_update when gameState is not set', async () => {
+    const { client, ws } = await makeConnectedClient();
+    // Clear game state to simulate the no-state path
+    client.disconnect();
+    (client as unknown as { _gameState: undefined })._gameState = undefined;
+
+    const updates: unknown[] = [];
+    client.on('state_update', (s) => updates.push(s));
+
+    const chatMsg = { id: 'm1', playerId: 'p1', playerName: 'Alice', text: 'hi', timestamp: 1 };
+    ws.receive({ type: 'chat_message', payload: chatMsg });
+
+    expect(updates).toHaveLength(0);
+  });
+});
+
+describe('MafiaClient — reconnect counter reset', () => {
+  it('resets _reconnectAttempts to 0 when reconnect succeeds', async () => {
+    const state = makeGameState();
+    // Responses: createGame, then connect attempts use WS not fetch
+    const fetch = makeFetch([{ ok: true, body: { gameId: 'g1', playerId: 'p1', state } }]);
+
+    // ws1 = first connection (succeeds), ws2 = reconnect attempt (will succeed)
+    const ws1 = new MockWebSocket();
+    const ws2 = new MockWebSocket();
+    let wsCallCount = 0;
+    const wsFactory = (_url: string): MockWebSocket => wsCallCount++ === 0 ? ws1 : ws2;
+
+    const client = new MafiaClient('http://localhost:3000', {
+      fetch,
+      webSocketFactory: wsFactory as WebSocketFactory,
+      reconnectDelayMs: 0,
+    });
+
+    await client.createGame('Alice');
+    const connectPromise = client.connect();
+    ws1.receive({ type: 'connected', payload: { state } });
+    await connectPromise;
+
+    // Simulate disconnect to trigger one reconnect attempt
+    ws1.close(); // this queues a setTimeout(0) reconnect
+
+    // Yield so the reconnect setTimeout fires and ws2 is created
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    // Now resolve the reconnect by sending 'connected' on ws2
+    ws2.receive({ type: 'connected', payload: { state } });
+
+    // Yield again so the onConnectedOnce handler runs
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    // After a successful reconnect, the counter should be back to 0
+    expect((client as unknown as { _reconnectAttempts: number })._reconnectAttempts).toBe(0);
+  });
+});

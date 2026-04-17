@@ -31,6 +31,7 @@ const mockMafia = {
   resolveVotes: jest.fn(),
   resolveNight: jest.fn(),
   leaveGame: jest.fn(),
+  leaveSpectator: jest.fn(),
   disconnect: jest.fn()
 };
 
