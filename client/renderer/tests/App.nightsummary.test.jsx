@@ -200,4 +200,31 @@ describe('App — night summary modal', () => {
 
     expect(document.querySelector('.night-summary-modal')).toBeInTheDocument();
   });
+
+  it('shows modal when state_update arrives on reconnect after missing night resolution', async () => {
+    // Simulates: player was in night phase, disconnected, night resolved, then
+    // MafiaClient reconnected and delivered the current day state via onStateUpdate.
+    // dismissedNightSummaryRound stays null (they never saw a summary this session),
+    // so the modal must appear.
+    const user = userEvent.setup();
+    // Start directly in night phase (round 0)
+    mockMafia.createGame.mockResolvedValue({
+      playerId: 'p1',
+      gameId: 'game-1',
+      state: { ...makeDayState(), phase: 'night', round: 0 }
+    });
+    render(<App />);
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.click(screen.getByRole('button', { name: 'Create Game' }));
+
+    // No summary shown during night phase
+    expect(document.querySelector('.night-summary-modal')).not.toBeInTheDocument();
+
+    // Reconnect delivers day state (night resolved while player was away)
+    const dayState = makeDayState({ round: 1, eliminatedThisRound: 'p2' });
+    const stateUpdateCallback = mockMafia.onStateUpdate.mock.calls[0][0];
+    act(() => stateUpdateCallback(dayState));
+
+    expect(document.querySelector('.night-summary-modal')).toBeInTheDocument();
+  });
 });
