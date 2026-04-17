@@ -32,6 +32,10 @@ export default function NightPhase({
 
   const deadPlayers = currentState.players.filter((p) => !p.isAlive);
 
+  const nightActorCount = currentState.nightActorCount ?? 0;
+  const nightSubmittedCount = currentState.nightSubmittedCount ?? 0;
+  const allActionsIn = nightActorCount > 0 && nightSubmittedCount >= nightActorCount;
+
   return (
     <>
       <div className="card stack">
@@ -140,6 +144,15 @@ export default function NightPhase({
         </div>
       )}
 
+      {(isHost || isSpectator) && nightActorCount > 0 && (
+        <div className="card stack">
+          <div className="section-heading">{t('playersLabel')}</div>
+          <p className="meta">
+            {t('nightActionsProgress', { submitted: nightSubmittedCount, total: nightActorCount })}
+          </p>
+        </div>
+      )}
+
       {isHost && (
         <div className="card stack">
           <div className="day-controls">
@@ -151,7 +164,10 @@ export default function NightPhase({
               />
               {t('forceResolve')}
             </label>
-            <button onClick={() => runAction(t('actionResolvingNight'), () => window.mafia.resolveNight(forceResolve))}>
+            <button
+              disabled={!forceResolve && !allActionsIn}
+              onClick={() => runAction(t('actionResolvingNight'), () => window.mafia.resolveNight(forceResolve))}
+            >
               {t('resolveNight')}
             </button>
           </div>

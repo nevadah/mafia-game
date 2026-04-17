@@ -452,6 +452,12 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
       if (!body) return;
       const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       game.submitNightAction(actorId, body.targetId);
+      const totalCount = game.getNightActionActorIds().length;
+      const submittedCount = totalCount - game.getMissingNightActionPlayerIds().length;
+      broadcast(game.id, {
+        type: 'night_action_submitted',
+        payload: { submittedCount, totalCount }
+      });
       return res.json({ state: game.toState(actorId) });
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 400;

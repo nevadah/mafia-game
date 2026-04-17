@@ -66,6 +66,7 @@ export interface ServerToClientMessage {
     | 'chat_message'
     | 'spectator_joined'
     | 'spectator_left'
+    | 'night_action_submitted'
     | 'error'
     | 'connected';
   payload?: unknown;
