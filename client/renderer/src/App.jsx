@@ -308,8 +308,8 @@ export default function App() {
       showStatus(t('statusReconnecting', { attempt, maxAttempts }), true)
     );
     window.mafia.onDisconnected(() => {
-      showStatus(t('statusDisconnected'), true);
       resetGameUi();
+      showStatus(t('statusDisconnected'), true);
     });
     function handleDeepLink(payload) {
       if (!payload) return;
