@@ -17,6 +17,7 @@ const mockMafia = {
   onServerError: jest.fn(),
   onDeepLink: jest.fn(),
   onReconnecting: jest.fn(),
+  onGameClosed: jest.fn(),
   onDisconnected: jest.fn(),
   getStartupDeepLink: jest.fn().mockResolvedValue(null),
   createGame: jest.fn(),
@@ -205,6 +206,34 @@ describe('App — WebSocket event errors', () => {
     const cb = mockMafia.onDisconnected.mock.calls[0][0];
     act(() => cb());
     expect(screen.getByText(/Connection lost/i)).toBeInTheDocument();
+  });
+
+  it('shows game-closed status when onGameClosed fires', () => {
+    render(<App />);
+    const cb = mockMafia.onGameClosed.mock.calls[0][0];
+    act(() => cb());
+    expect(screen.getByText(/Game closed/i)).toBeInTheDocument();
+  });
+
+  it('resets to entry screen when onGameClosed fires mid-game', async () => {
+    const user = userEvent.setup();
+    mockMafia.createGame.mockResolvedValue({
+      playerId: 'p1',
+      gameId: 'game-1',
+      state: makeLobbyState()
+    });
+
+    render(<App />);
+    await user.type(screen.getByPlaceholderText('Enter your name'), 'Alice');
+    await user.click(screen.getByRole('button', { name: 'Create Game' }));
+
+    expect(await screen.findByText('Lobby')).toBeInTheDocument();
+
+    const cb = mockMafia.onGameClosed.mock.calls[0][0];
+    act(() => cb());
+
+    expect(screen.getByRole('button', { name: 'Create Game' })).toBeInTheDocument();
+    expect(screen.queryByText('Lobby')).not.toBeInTheDocument();
   });
 
   it('resets to entry screen when onDisconnected fires mid-game', async () => {

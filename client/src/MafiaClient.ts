@@ -582,6 +582,10 @@ export class MafiaClient extends EventEmitter {
         this.emit('chat_message', msg.payload);
         break;
       }
+      case 'game_closed':
+        this._gameState = undefined;
+        this.emit('game_closed', undefined);
+        break;
       case 'error':
         this.emit('server_error', msg.payload);
         break;

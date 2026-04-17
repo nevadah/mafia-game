@@ -97,6 +97,7 @@ function attachClientEvents(c: MafiaClient): void {
   c.on('spectator_joined', (p) => mainWindow?.webContents.send('mafia:spectator_joined', p));
   c.on('spectator_left', (p) => mainWindow?.webContents.send('mafia:spectator_left', p));
   c.on('night_action_submitted', (p) => mainWindow?.webContents.send('mafia:night_action_submitted', p));
+  c.on('game_closed', () => mainWindow?.webContents.send('mafia:game_closed'));
   c.on('reconnecting', (p) => mainWindow?.webContents.send('mafia:reconnecting', p));
   c.on('disconnected', () => mainWindow?.webContents.send('mafia:disconnected'));
 }

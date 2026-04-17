@@ -19,6 +19,7 @@ const mockMafia = {
   onSpectatorJoined: jest.fn(),
   onSpectatorLeft: jest.fn(),
   onReconnecting: jest.fn(),
+  onGameClosed: jest.fn(),
   onDisconnected: jest.fn(),
   getStartupDeepLink: jest.fn().mockResolvedValue(null),
   createGame: jest.fn(),

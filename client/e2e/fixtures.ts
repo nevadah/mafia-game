@@ -145,3 +145,10 @@ export async function waitForPhase(page: Page, phasePrefix: string): Promise<voi
     { timeout: 15_000 },
   );
 }
+
+/**
+ * Wait for the game-over screen to appear.
+ */
+export async function waitForGameOver(page: Page): Promise<void> {
+  await page.waitForSelector('.game-over-banner', { timeout: 15_000 });
+}

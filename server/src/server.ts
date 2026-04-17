@@ -554,7 +554,9 @@ export function createApp(gameManager: GameManager, broadcastRef?: BroadcastRef)
       const actorId = resolveActorPlayerId(req, gameManager, game.id, body.playerId);
       const { deletedGame } = gameManager.leaveGame(game.id, actorId);
 
-      if (!deletedGame) {
+      if (deletedGame) {
+        broadcast(game.id, { type: 'game_closed', payload: {} });
+      } else {
         broadcast(game.id, {
           type: 'player_left',
           payload: { playerId: actorId, state: game.toState() }
@@ -729,7 +731,9 @@ export function createWebSocketServer(
           } else if (game.getPlayer(playerId)) {
             try {
               const { deletedGame } = gameManager.leaveGame(gameId, playerId);
-              if (!deletedGame) {
+              if (deletedGame) {
+                broadcast(gameId, { type: 'game_closed', payload: {} });
+              } else {
                 broadcast(gameId, {
                   type: 'player_left',
                   payload: { playerId, state: game.toState() }
