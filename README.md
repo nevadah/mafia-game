@@ -93,6 +93,18 @@ npm run test:server
 npm run test:client
 ```
 
+Run Playwright end-to-end tests (Electron UI):
+
+```bash
+# First-time setup — install Playwright browsers
+npx playwright install --with-deps
+
+# Run the full e2e suite
+npm run test:e2e --workspace=client
+```
+
+The suite runs serially (one worker) against real Electron windows. A full HTML report is written to `client/e2e-report/` after each run; open `client/e2e-report/index.html` to browse results.
+
 ## Documentation
 
 - `docs/README.md`: Documentation index and navigation guide
