@@ -6,6 +6,7 @@ import {
   joinGame,
   markReady,
   waitForPhase,
+  dismissNightSummary,
   launchApp,
   getWindow,
 } from './fixtures';
@@ -48,6 +49,7 @@ test.describe('Host leaves mid-game', () => {
     await hostWindow.getByRole('checkbox', { name: 'Force resolve' }).check();
     await hostWindow.getByRole('button', { name: 'Resolve Night' }).click();
     await waitForPhase(hostWindow, 'Day');
+    await dismissNightSummary(hostWindow);
 
     return joiners;
   }

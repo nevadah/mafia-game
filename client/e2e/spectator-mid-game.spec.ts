@@ -6,6 +6,7 @@ import {
   joinGame,
   markReady,
   waitForPhase,
+  dismissNightSummary,
   launchApp,
   getWindow,
   spectateGame,
@@ -46,6 +47,7 @@ test.describe('Spectator joins mid-game', () => {
     await hostWindow.getByRole('checkbox', { name: 'Force resolve' }).check();
     await hostWindow.getByRole('button', { name: 'Resolve Night' }).click();
     await waitForPhase(hostWindow, 'Day');
+    await dismissNightSummary(hostWindow);
 
     return gameId;
   }

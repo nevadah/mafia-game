@@ -7,6 +7,7 @@ import {
   markReady,
   waitForPhase,
   waitForGameOver,
+  dismissNightSummary,
   launchApp,
   getWindow,
 } from './fixtures';
@@ -43,8 +44,12 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
   if (overAfterNight) return true;
 
   // ── Day ─────────────────────────────────────────────────────────────────────
-  // Each window that still has vote buttons casts a vote for the first option
   const allWindows = [hostWindow, ...joinerWindows];
+
+  // Dismiss the NightSummaryModal on every window before interacting with day UI.
+  for (const w of allWindows) {
+    await dismissNightSummary(w);
+  }
   for (const w of allWindows) {
     const btn = w.locator('.vote-btn').first();
     const visible = await btn.isVisible().catch(() => false);

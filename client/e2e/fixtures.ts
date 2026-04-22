@@ -152,3 +152,15 @@ export async function waitForPhase(page: Page, phasePrefix: string): Promise<voi
 export async function waitForGameOver(page: Page): Promise<void> {
   await page.waitForSelector('.game-over-banner', { timeout: 15_000 });
 }
+
+/**
+ * Dismiss the NightSummaryModal ("Got it") if it is currently visible.
+ * Safe to call when the modal is absent.
+ */
+export async function dismissNightSummary(page: Page): Promise<void> {
+  const btn = page.getByRole('button', { name: 'Got it' });
+  if (await btn.isVisible().catch(() => false)) {
+    await btn.click();
+    await btn.waitFor({ state: 'hidden', timeout: 5_000 });
+  }
+}
