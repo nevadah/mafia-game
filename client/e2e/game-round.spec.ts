@@ -1,8 +1,6 @@
 import { ElectronApplication, Page } from 'playwright';
 import { test, expect, createGame, joinGame, markReady, waitForPhase, launchApp, getWindow } from './fixtures';
 
-test.use({ timeout: 60_000 });
-
 /**
  * Launch N extra Electron windows and join each to an existing game.
  * Returns the apps and their pages so the caller can close them in afterEach.

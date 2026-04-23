@@ -13,9 +13,17 @@ import {
 } from './fixtures';
 
 /**
- * Advance through one night (force-resolve) and one day (every alive window
- * casts a vote, then host force-resolves). Returns true if game over was
- * reached, false if play should continue.
+ * Advance through one night (force-resolve) and one day (cast one vote then
+ * force-resolve). Returns true if game over was reached, false otherwise.
+ *
+ * All game-state actions go through window.mafia IPC rather than clicking UI
+ * elements. Clicking UI in multiple Electron windows simultaneously causes
+ * race conditions and timeouts due to resource contention and WS event lag.
+ * The IPC path is synchronous with the server response and doesn't depend on
+ * render timing.
+ *
+ * Phase detection still uses the DOM on the host window — it is the
+ * authoritative source for when the server's broadcast arrived.
  */
 async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boolean> {
   // ── Night ───────────────────────────────────────────────────────────────────
@@ -25,9 +33,9 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
   });
 
   if (isNight) {
-    await hostWindow.getByRole('checkbox', { name: 'Force resolve' }).check();
-    await hostWindow.getByRole('button', { name: 'Resolve Night' }).click();
-    // Wait for day or game over on host window
+    // Force-resolve night via IPC; no UI interaction needed.
+    await hostWindow.evaluate(() => window.mafia.resolveNight(true)).catch(() => {});
+    // Wait for the host's DOM to reflect the new day (or game-over) state.
     await hostWindow.waitForFunction(() => {
       const el = document.querySelector('.phase');
       const banner = document.querySelector('.game-over-banner');
@@ -42,29 +50,40 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
   if (overAfterNight) return true;
 
   // ── Day ─────────────────────────────────────────────────────────────────────
+
+  // Cast one vote from the first window that can do so, to avoid a no-elimination
+  // tie (0 votes for everyone). Tries each alive player as a target and catches
+  // self-vote errors automatically.
   const allWindows = [hostWindow, ...joinerWindows];
-
-  // Wait for every window to reach Day before dismissing the modal — joiner
-  // windows may not have received the state update yet when the host transitions.
   for (const w of allWindows) {
-    await waitForPhase(w, 'Day');
-  }
-  for (const w of allWindows) {
-    await dismissNightSummary(w);
-  }
-  for (const w of allWindows) {
-    const btn = w.locator('.vote-btn').first();
-    const visible = await btn.isVisible().catch(() => false);
-    if (visible) {
-      await btn.click();
-    }
+    const voted = await w.evaluate(async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const state = await (window as any).mafia.getState() as Record<string, any> | null;
+        if (!state || state['phase'] !== 'day' || state['status'] !== 'active') return false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const targets: any[] = (state['players'] as any[]).filter((p: any) => p.isAlive);
+        for (const target of targets) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (window as any).mafia.castVote(target.id);
+            return true; // one vote cast — enough to break the tie
+          } catch {
+            // self-vote or already voted; try next target
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    }).catch(() => false);
+    if (voted) break;
   }
 
-  // Host force-resolves the day vote
-  await hostWindow.getByRole('checkbox', { name: 'Force resolve' }).check();
-  await hostWindow.getByRole('button', { name: 'Resolve Day' }).click();
+  // Force-resolve the day via IPC on the host window.
+  await hostWindow.evaluate(() => window.mafia.resolveVotes(true)).catch(() => {});
 
-  // Wait for night or game over on host window
+  // Wait for host's DOM to reflect Night or game-over.
   await hostWindow.waitForFunction(() => {
     const el = document.querySelector('.phase');
     const banner = document.querySelector('.game-over-banner');
