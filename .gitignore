@@ -11,7 +11,6 @@ mafia-test-server-pid.txt
 .dolt/
 *.db
 .beads-credential-key
-.beads/issues.jsonl
 .beads/embeddeddolt/
 .beads/interactions.jsonl
 .beads/export-state.json
