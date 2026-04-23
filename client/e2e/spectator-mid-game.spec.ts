@@ -12,8 +12,6 @@ import {
   spectateGame,
 } from './fixtures';
 
-test.use({ timeout: 60_000 });
-
 test.describe('Spectator joins mid-game', () => {
   const extraApps: ElectronApplication[] = [];
 

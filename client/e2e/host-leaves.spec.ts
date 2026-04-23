@@ -11,8 +11,6 @@ import {
   getWindow,
 } from './fixtures';
 
-test.use({ timeout: 60_000 });
-
 test.describe('Host leaves mid-game', () => {
   const extraApps: ElectronApplication[] = [];
 

@@ -81,8 +81,6 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
 }
 
 test.describe('Complete game flow — 4 players', () => {
-  test.use({ timeout: 120_000 });
-
   const extraApps: ElectronApplication[] = [];
 
   test.afterEach(async () => {
