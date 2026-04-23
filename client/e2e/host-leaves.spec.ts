@@ -69,10 +69,11 @@ test.describe('Host leaves mid-game', () => {
     // Host leaves — this deletes the game and broadcasts game_closed
     await window.getByRole('button', { name: 'Leave Game' }).click();
 
-    // Each remaining player window should return to the entry screen
-    // with the "Game closed" status message
+    // Each remaining player window should return to the entry screen.
+    // Joiners were in "Join Game" mode, so check for the entry screen
+    // element rather than the mode-dependent Create/Join button.
     for (const w of joiners) {
-      await expect(w.getByRole('button', { name: 'Create Game' })).toBeVisible({ timeout: 15_000 });
+      await expect(w.locator('.entry-screen')).toBeVisible({ timeout: 15_000 });
     }
 
     void app; // suppress unused-variable warning — fixture manages host app lifecycle

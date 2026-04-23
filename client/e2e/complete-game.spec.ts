@@ -46,7 +46,11 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
   // ── Day ─────────────────────────────────────────────────────────────────────
   const allWindows = [hostWindow, ...joinerWindows];
 
-  // Dismiss the NightSummaryModal on every window before interacting with day UI.
+  // Wait for every window to reach Day before dismissing the modal — joiner
+  // windows may not have received the state update yet when the host transitions.
+  for (const w of allWindows) {
+    await waitForPhase(w, 'Day');
+  }
   for (const w of allWindows) {
     await dismissNightSummary(w);
   }
