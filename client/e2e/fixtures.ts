@@ -160,9 +160,12 @@ export async function waitForGameOver(page: Page): Promise<void> {
  * Safe to call when the modal is absent.
  */
 export async function dismissNightSummary(page: Page): Promise<void> {
-  const btn = page.getByRole('button', { name: 'Got it' });
-  if (await btn.isVisible().catch(() => false)) {
-    await btn.click();
-    await btn.waitFor({ state: 'hidden', timeout: 5_000 });
+  const overlay = page.locator('.night-summary-overlay');
+  try {
+    await overlay.waitFor({ state: 'visible', timeout: 3_000 });
+  } catch {
+    return;
   }
+  await overlay.getByRole('button', { name: 'Got it' }).click();
+  await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
 }

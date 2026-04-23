@@ -12,8 +12,6 @@ import {
   getWindow,
 } from './fixtures';
 
-test.use({ timeout: 120_000 });
-
 /**
  * Advance through one night (force-resolve) and one day (every alive window
  * casts a vote, then host force-resolves). Returns true if game over was
@@ -83,6 +81,8 @@ async function playRound(hostWindow: Page, joinerWindows: Page[]): Promise<boole
 }
 
 test.describe('Complete game flow — 4 players', () => {
+  test.use({ timeout: 120_000 });
+
   const extraApps: ElectronApplication[] = [];
 
   test.afterEach(async () => {
