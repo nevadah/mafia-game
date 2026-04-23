@@ -258,7 +258,6 @@ ipcMain.handle('mafia:leave-spectator', async () => {
 
 ipcMain.handle('mafia:disconnect', () => {
   client?.disconnect();
-  client = null;
 });
 
 ipcMain.handle('mafia:connect', async () => {
