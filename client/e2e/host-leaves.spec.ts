@@ -6,11 +6,10 @@ import {
   joinGame,
   markReady,
   waitForPhase,
+  dismissNightSummary,
   launchApp,
   getWindow,
 } from './fixtures';
-
-test.use({ timeout: 60_000 });
 
 test.describe('Host leaves mid-game', () => {
   const extraApps: ElectronApplication[] = [];
@@ -48,6 +47,7 @@ test.describe('Host leaves mid-game', () => {
     await hostWindow.getByRole('checkbox', { name: 'Force resolve' }).check();
     await hostWindow.getByRole('button', { name: 'Resolve Night' }).click();
     await waitForPhase(hostWindow, 'Day');
+    await dismissNightSummary(hostWindow);
 
     return joiners;
   }
@@ -67,10 +67,11 @@ test.describe('Host leaves mid-game', () => {
     // Host leaves — this deletes the game and broadcasts game_closed
     await window.getByRole('button', { name: 'Leave Game' }).click();
 
-    // Each remaining player window should return to the entry screen
-    // with the "Game closed" status message
+    // Each remaining player window should return to the entry screen.
+    // Joiners were in "Join Game" mode, so check for the entry screen
+    // element rather than the mode-dependent Create/Join button.
     for (const w of joiners) {
-      await expect(w.getByRole('button', { name: 'Create Game' })).toBeVisible({ timeout: 15_000 });
+      await expect(w.locator('.entry-screen')).toBeVisible({ timeout: 15_000 });
     }
 
     void app; // suppress unused-variable warning — fixture manages host app lifecycle

@@ -108,6 +108,8 @@ export async function joinGame(
 
 /**
  * From the entry screen, join an existing game as a spectator.
+ * Waits for either the lobby (.game-code-value) or an active-game phase
+ * (.phase), since spectators joining mid-game land directly on DayPhase.
  */
 export async function spectateGame(
   page: Page,
@@ -120,7 +122,7 @@ export async function spectateGame(
   await page.getByPlaceholder('Enter your name').fill(spectatorName);
   await page.getByPlaceholder('Enter game code').fill(gameId);
   await page.locator('.btn-full.btn-secondary', { hasText: 'Spectate' }).click();
-  await page.waitForSelector('.game-code-value');
+  await page.waitForSelector('.game-code-value, .phase');
 }
 
 /**
@@ -151,4 +153,19 @@ export async function waitForPhase(page: Page, phasePrefix: string): Promise<voi
  */
 export async function waitForGameOver(page: Page): Promise<void> {
   await page.waitForSelector('.game-over-banner', { timeout: 15_000 });
+}
+
+/**
+ * Dismiss the NightSummaryModal ("Got it") if it is currently visible.
+ * Safe to call when the modal is absent.
+ */
+export async function dismissNightSummary(page: Page): Promise<void> {
+  const overlay = page.locator('.night-summary-overlay');
+  try {
+    await overlay.waitFor({ state: 'visible', timeout: 3_000 });
+  } catch {
+    return;
+  }
+  await overlay.getByRole('button', { name: 'Got it' }).click();
+  await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
 }

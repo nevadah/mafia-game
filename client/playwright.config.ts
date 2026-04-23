@@ -7,8 +7,10 @@ export default defineConfig({
   // Electron apps are expensive; run tests serially to avoid resource contention.
   workers: 1,
 
-  // Per-test timeout (seconds). game-round.spec.ts overrides to 60 s.
-  timeout: 30_000,
+  // Per-test timeout. Complete-game tests play up to 4 full rounds so need
+  // more headroom; test.use({ timeout }) doesn't propagate on extended test
+  // objects, so the global value must be large enough for the slowest suite.
+  timeout: 120_000,
 
   // Default assertion timeout.
   expect: { timeout: 10_000 },

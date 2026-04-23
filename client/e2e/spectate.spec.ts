@@ -61,7 +61,7 @@ test.describe('Spectate flow', () => {
     await expect(spectator.getByRole('button', { name: 'Leave' })).toBeVisible();
   });
 
-  test('spectator does not appear in the player list', async ({ window, serverUrl }) => {
+  test('spectator shows Spectating badge instead of Ready/Not Ready in the lobby list', async ({ window, serverUrl }) => {
     const gameId = await createGame(window, 'Alice', serverUrl);
 
     secondApp = await launchApp();
